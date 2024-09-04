@@ -12,6 +12,8 @@ jobs:
       statuses: read
       security-events: write
     uses: affinidi/pipeline-security/.github/workflows/security-scanners.yml@main
+    with:
+      config-path: .github/labeler.yml
   cargo-deny:
     name: "License check"
     runs-on: ubuntu-24.04
