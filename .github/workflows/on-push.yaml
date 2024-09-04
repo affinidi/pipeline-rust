@@ -14,7 +14,6 @@ jobs:
       statuses: read
       security-events: write
     uses: affinidi/pipeline-security/.github/workflows/security-scanners.yml@main
-    secrets: inherit
   cargo-deny:
     name: "License check"
     runs-on: ubuntu-24.04
