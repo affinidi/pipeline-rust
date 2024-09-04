@@ -96,7 +96,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main'
-    needs: [ security, cargo-deny, check, fmt, test ]
+    needs: [ security, cargo-deny, check, fmt, test, clippy ]
     runs-on: ubuntu-24.04
 
     steps:
