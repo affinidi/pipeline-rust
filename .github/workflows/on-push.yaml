@@ -4,8 +4,6 @@ on:
       environment:
         required: false
         type: string
-        default: branch
-
 jobs:
   security:
     permissions:
