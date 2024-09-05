@@ -117,7 +117,6 @@ jobs:
             echo "Publishing crate $crate..."
             cd $crate
             cargo publish ${{ inputs.publish_dry_run && '--dry-run' || '' }}
-            fi
             cd ..
           done
         env:
