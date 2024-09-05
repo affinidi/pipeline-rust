@@ -13,20 +13,28 @@ on:
         required: false
         type: boolean
         default: true
+      auditIgnore:
+        required: false
+        type: string
+        default: ""
     secrets:
      CARGO_REGISTRY_TOKEN:
       description: crates.io access token
       required: false
 jobs:
-  security:
+  audit:
+    runs-on: ubuntu-latest
     permissions:
       contents: read
-      checks: read
-      statuses: read
-      security-events: write
-    uses: affinidi/pipeline-security/.github/workflows/security-scanners.yml@main
-    with:
-      config-path: .github/labeler.yml
+      issues: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rust-lang/audit@v1
+        name: Audit Rust Dependencies
+        with:
+          # Comma separated list of issues to ignore (or configure in audit.toml)
+          ignore: ${{ inputs.auditIgnore }}
+
   cargo-deny:
     name: "License check"
     runs-on: ubuntu-24.04
@@ -96,7 +104,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main'
-    needs: [ security, cargo-deny, check, fmt, test, clippy ]
+    needs: [ cargo-deny, check, fmt, test, clippy ]
     runs-on: ubuntu-24.04
 
     steps:
