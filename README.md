@@ -2,7 +2,6 @@
 
 pipleline for Affinidi rust projects
 
-
 ## How to use
 
 add file to `.github/workflows/on-push.yaml`

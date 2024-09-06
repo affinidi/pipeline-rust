@@ -18,9 +18,9 @@ on:
         type: string
         default: ""
     secrets:
-     CARGO_REGISTRY_TOKEN:
-      description: crates.io access token
-      required: false
+      CARGO_REGISTRY_TOKEN:
+        description: crates.io access token
+        required: false
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -47,10 +47,10 @@ jobs:
     name: "License check"
     runs-on: ubuntu-24.04
     steps:
-    - uses: actions/checkout@v4
-    - uses: EmbarkStudios/cargo-deny-action@v1
-      with:
-        command: check bans licenses sources
+      - uses: actions/checkout@v4
+      - uses: EmbarkStudios/cargo-deny-action@v1
+        with:
+          command: check bans licenses sources
   check:
     name: Cargo Check
     runs-on: ubuntu-24.04
@@ -84,7 +84,6 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
-      - *cache-cargo
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -113,7 +112,7 @@ jobs:
 
   release:
     if: github.ref == 'refs/heads/main'
-    needs: [ cargo-deny, check, fmt, test, clippy, audit ]
+    needs: [cargo-deny, check, fmt, test, clippy, audit]
     runs-on: ubuntu-24.04
 
     steps:
