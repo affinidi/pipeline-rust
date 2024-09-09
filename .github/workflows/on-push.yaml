@@ -135,6 +135,16 @@ jobs:
       - name: Build project
         run: cargo build --release
 
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-release-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-${{ github.ref_name }} 
+ 
       - name: Release
         run: |
           for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname | sort); do
