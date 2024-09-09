@@ -120,7 +120,8 @@ jobs:
           command: clippy
 
   release:
-    if: base_ref == 'main'
+    # if: base_ref == 'main'
+    if: false
     needs: [cargo-deny, check, fmt, test, clippy, audit]
     runs-on: ubuntu-24.04
     environment: "release"
