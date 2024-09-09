@@ -1,5 +1,5 @@
 on:
-  push:
+  workflow_call:
     inputs:
       environment:
         required: false
@@ -120,10 +120,10 @@ jobs:
           command: clippy
 
   release:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main1'
     needs: [cargo-deny, check, fmt, test, clippy, audit]
     runs-on: ubuntu-24.04
-    # environment: "release"
+    environment: "release"
 
     steps:
       - uses: actions/checkout@v2
@@ -152,7 +152,7 @@ jobs:
           for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname); do
             echo "Publishing crate $crate..."
             cd $crate
-            cargo publish ${{ inputs.publish_dry_run && '--dry-run' || '' }}
+            # cargo publish ${{ inputs.publish_dry_run && '--dry-run' || '' }}
             cd ..
           done
         env:
