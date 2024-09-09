@@ -122,6 +122,7 @@ jobs:
     if: github.ref == 'refs/heads/main'
     needs: [cargo-deny, check, fmt, test, clippy, audit]
     runs-on: ubuntu-24.04
+    environment: "release" 
 
     steps:
       - uses: actions/checkout@v2
