@@ -147,7 +147,7 @@ jobs:
  
       - name: Release
         run: |
-          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname | sort); do
+          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname); do
             echo "Publishing crate $crate..."
             cd $crate
             cargo publish ${{ inputs.publish_dry_run && '--dry-run' || '' }}
