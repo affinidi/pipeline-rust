@@ -1,5 +1,5 @@
 on:
-  workflow_dispatch:
+  push:
     inputs:
       environment:
         required: false
@@ -21,6 +21,7 @@ on:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
         required: false
+
 jobs:
   audit:
     runs-on: ubuntu-latest
