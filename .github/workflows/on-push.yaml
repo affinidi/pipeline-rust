@@ -29,6 +29,9 @@ jobs:
       issues: write
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }} 
       - uses: actions-rust-lang/audit@v1
         name: Audit Rust Dependencies
         with:
@@ -50,6 +53,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }} 
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check bans licenses sources
@@ -58,6 +64,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+          
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -72,6 +82,10 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+ 
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -96,6 +110,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -112,6 +129,9 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -127,8 +147,10 @@ jobs:
     runs-on: ubuntu-24.04
     environment: "release" 
     steps:
-      - uses: actions/checkout@v2
-
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
