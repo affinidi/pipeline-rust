@@ -32,10 +32,7 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rust-lang/audit@v1
         name: Audit Rust Dependencies
         with:
@@ -56,10 +53,7 @@ jobs:
     name: "License check"
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/checkout-head-ref
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check bans licenses sources
@@ -67,11 +61,7 @@ jobs:
     name: Cargo Check
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
-
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -85,11 +75,7 @@ jobs:
     name: Test Suite
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
-
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -113,10 +99,7 @@ jobs:
     name: Rustfmt
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -132,10 +115,7 @@ jobs:
     name: Clippy
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -151,10 +131,7 @@ jobs:
     runs-on: ubuntu-24.04
     environment: "release"
     steps:
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-          ref: ${{ github.head_ref }}
+      - uses: ./.github/actions/checkout-head-ref
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -179,7 +156,7 @@ jobs:
       - name: Release
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
-          echo branch: ${{ inputs.branch }}
+          echo github.ref: ${{ github.ref }}
           # for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname); do
           #   echo "Publishing crate $crate..."
           #   cd $crate

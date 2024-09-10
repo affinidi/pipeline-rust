@@ -1,0 +1,10 @@
+name: "checkout-head_ref"
+description: "Checks out github.head_ref"
+author: "Affinidi"
+runs:
+  using: "composite"
+  steps:
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ github.head_ref }}
