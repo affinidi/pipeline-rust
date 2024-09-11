@@ -1,0 +1,61 @@
+on:
+  workflow_call:
+    inputs:
+      toolchain:
+        required: false
+        type: string
+        default: stable
+      # do not publish unless said so
+      publish_dry_run:
+        required: false
+        type: boolean
+        default: true
+      auditIgnore:
+        required: false
+        type: string
+        default: ""
+    secrets:
+      CARGO_REGISTRY_TOKEN:
+        description: crates.io access token
+        required: false
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: "release" 
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ inputs.toolchain }}
+          override: true
+
+      - name: Build project
+        run: cargo build --release
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-release-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-release-${{ github.ref_name }} 
+ 
+      - name: Release
+        if: ${{ github.ref == 'refs/heads/main' }}
+        run: |
+          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname); do
+            echo "Publishing crate $crate..."
+            cd $crate
+            cargo publish ${{ inputs.publish_dry_run && '--dry-run' || '' }}
+            cd ..
+          done
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}

@@ -4,24 +4,42 @@ pipleline for Affinidi rust projects
 
 ## How to use
 
-add file to `.github/workflows/on-push.yaml`
+1. add file to `.github/workflows/checks.yaml`
 
 ```yaml
-name: on-push
+name: checks
 
 on:
-  # Run pipeline in context of branch, but with action config from main for opened and rebased mr's
-  # also run on  branch main
-  push:
-    branches:
-      - main
   pull_request_target:
     types:
       - opened
       - synchronize
-
+      
 jobs:
-  call-workflow:
-    uses: affinidi/pipeline-rust/.github/workflows/on-push.yaml@main
+  rust-pipeline:
+    uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@fix/release-issue
     secrets: inherit
+    with:
+      auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
+
+
+```
+
+2. add file to `.github/workflows/checks.yaml`
+
+```yaml
+name: "release"
+
+on:
+  push:
+    branches:
+      - main
+
+ 
+jobs:
+  rust-pipeline:
+    uses: affinidi/pipeline-rust/.github/workflows/release.yaml@fix/release-issue
+    secrets: inherit
+    with:
+      auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
 ```

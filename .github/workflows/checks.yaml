@@ -1,26 +1,14 @@
 on:
   workflow_call:
     inputs:
-      environment:
-        required: false
-        type: string
       toolchain:
         required: false
         type: string
         default: stable
-      # do not publish unless said so
-      publish_dry_run:
-        required: false
-        type: boolean
-        default: true
       auditIgnore:
         required: false
         type: string
         default: ""
-    secrets:
-      CARGO_REGISTRY_TOKEN:
-        description: crates.io access token
-        required: false
 jobs:
   audit:
     runs-on: ubuntu-latest
