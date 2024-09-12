@@ -14,18 +14,16 @@ on:
     types:
       - opened
       - synchronize
-      
+
 jobs:
   rust-pipeline:
-    uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@fix/release-issue
+    uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@main
     secrets: inherit
     with:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
-
-
 ```
 
-2. add file to `.github/workflows/checks.yaml`
+2. add file to `.github/workflows/release.yaml`
 
 ```yaml
 name: "release"
@@ -35,10 +33,9 @@ on:
     branches:
       - main
 
- 
 jobs:
   rust-pipeline:
-    uses: affinidi/pipeline-rust/.github/workflows/release.yaml@fix/release-issue
+    uses: affinidi/pipeline-rust/.github/workflows/release.yaml@main
     secrets: inherit
     with:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
