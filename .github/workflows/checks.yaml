@@ -129,3 +129,7 @@ jobs:
       - uses: actions-rs/cargo@v1
         with:
           command: clippy
+
+  wiz-scan:
+     uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
+     secrets: inherit
