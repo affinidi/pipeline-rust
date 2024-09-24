@@ -9,6 +9,11 @@ on:
         required: false
         type: string
         default: ""
+      coverage:
+        required: false
+        type: number
+        default: 14
+
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -133,3 +138,27 @@ jobs:
   wiz-scan:
      uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
      secrets: inherit
+
+  coverage:
+    name: Coverage
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ inputs.toolchain }}
+          override: true
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            target/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+      - name: Generate code coverage
+        run: |
+          cargo install cargo-tarpaulin
+          cargo tarpaulin --engine llvm --fail-under=${{ inputs.coverage }} --workspace
