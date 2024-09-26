@@ -12,7 +12,7 @@ on:
       coverage:
         required: false
         type: number
-        default: 14
+        default: 80
 
 jobs:
   audit:
@@ -24,7 +24,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }} 
+          ref: ${{ github.head_ref }}
       - uses: actions-rust-lang/audit@v1
         name: Audit Rust Dependencies
         with:
@@ -48,7 +48,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ github.head_ref }} 
+          ref: ${{ github.head_ref }}
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
           command: check bans licenses sources
@@ -60,7 +60,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-          
+
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -78,7 +78,7 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
- 
+
       - uses: actions-rs/toolchain@v1
         with:
           profile: minimal
@@ -97,7 +97,7 @@ jobs:
             target/
           key: ${{ runner.os }}-cargo-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
-            ${{ runner.os }}-cargo-${{ github.ref_name }} 
+            ${{ runner.os }}-cargo-${{ github.ref_name }}
   fmt:
     name: Rustfmt
     runs-on: ubuntu-24.04
@@ -136,8 +136,8 @@ jobs:
           command: clippy
 
   wiz-scan:
-     uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
-     secrets: inherit
+    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
+    secrets: inherit
 
   coverage:
     name: Coverage
@@ -163,4 +163,4 @@ jobs:
           if ! cargo tarpaulin --version; then
             cargo install cargo-tarpaulin
           fi
-          cargo tarpaulin --engine llvm --fail-under=${{ inputs.coverage }} --workspace
+          cargo tarpaulin --skip-clean --engine llvm --fail-under=${{ inputs.coverage }} --workspace
