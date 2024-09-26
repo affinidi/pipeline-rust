@@ -160,5 +160,7 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Generate code coverage
         run: |
-          cargo install cargo-tarpaulin
+          if ! cargo tarpaulin --version; then
+            cargo install cargo-tarpaulin
+          fi
           cargo tarpaulin --engine llvm --fail-under=${{ inputs.coverage }} --workspace
