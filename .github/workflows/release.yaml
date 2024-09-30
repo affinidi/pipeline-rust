@@ -54,7 +54,7 @@ jobs:
           if ! cargo release --version; then
             cargo install cargo-release
           fi
-          cargo release --verbose --workspace
+          cargo release --verbose --no-confirm --workspace
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
@@ -64,6 +64,6 @@ jobs:
           if ! cargo release --version; then
             cargo install cargo-release
           fi
-          cargo release --verbose --workspace ${{ inputs.release_dry_run && '' || '--execute' }}
+          cargo release --verbose --no-confirm --workspace ${{ inputs.release_dry_run && '' || '--execute' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
