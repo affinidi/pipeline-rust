@@ -1,6 +1,6 @@
 # pipeline-rust
 
-pipleline for Affinidi rust projects
+pipeline for Affinidi rust projects
 
 ## How to use
 
