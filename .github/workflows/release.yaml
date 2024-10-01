@@ -29,6 +29,7 @@ jobs:
 
       - name: configure git
         run: |
+          echo "GITHUB_ACTOR=${GITHUB_ACTOR}"
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
@@ -54,22 +55,12 @@ jobs:
             ${{ runner.os }}-cargo-release-${{ github.ref_name }}
 
       - name: Release
-        if: ${{ github.ref != 'refs/heads/main' }}
-        run: |
-          # dry-run
-          if ! cargo release --version; then
-            cargo install cargo-release
-          fi
-          cargo release --verbose --no-confirm --workspace
-        env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
-
-      - name: Release
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           if ! cargo release --version; then
             cargo install cargo-release
           fi
-          cargo release --verbose --no-confirm --workspace ${{ inputs.release_dry_run && '' || '--execute' }}
+          # '--verbose' was moved to the condition as if yes is '' in 'condition && yes || no' then no is picked (as condition && '' is false)
+          cargo release --no-confirm --workspace ${{ inputs.release_dry_run && '--verbose' || '--verbose --execute' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
