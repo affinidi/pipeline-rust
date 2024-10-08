@@ -102,6 +102,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ github.ref_name }}
       - name: Cleanup Redis
+        if: ${{ always() }}
         run: |
           docker stop redis-local
           docker rm redis-local
