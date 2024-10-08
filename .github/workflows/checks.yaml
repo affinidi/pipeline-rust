@@ -8,7 +8,7 @@ on:
       auditIgnore:
         required: false
         type: string
-        default: ""
+        default: ''
       coverage:
         required: false
         type: number
@@ -42,7 +42,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ github.ref_name }}
   cargo-deny:
-    name: "License check"
+    name: 'License check'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -84,6 +84,9 @@ jobs:
           profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
+      - name: Start Redis
+        run: |
+          docker run --name=redis-local --publish=6379:6379 --hostname=redis --restart=on-failure --detach redis:latest
       - uses: actions-rs/cargo@v1
         with:
           command: test
@@ -98,6 +101,10 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-${{ github.ref_name }}
+      - name: Cleanup Redis
+        run: |
+          docker stop redis-local
+          docker rm redis-local
   fmt:
     name: Rustfmt
     runs-on: ubuntu-24.04
