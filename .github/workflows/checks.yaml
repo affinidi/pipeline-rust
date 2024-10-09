@@ -13,6 +13,10 @@ on:
         required: false
         type: number
         default: 80
+      useRedis:
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   audit:
@@ -75,7 +79,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       redis:
-        image: redis
+        image: ${{ inputs.useRedis && 'redis' || ''}}
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
@@ -156,7 +160,7 @@ jobs:
     runs-on: ubuntu-24.04
     services:
       redis:
-        image: redis
+        image: ${{ inputs.useRedis && 'redis' || ''}}
         options: >-
           --health-cmd "redis-cli ping"
           --health-interval 10s
