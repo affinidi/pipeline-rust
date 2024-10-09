@@ -8,11 +8,15 @@ on:
       auditIgnore:
         required: false
         type: string
-        default: ""
+        default: ''
       coverage:
         required: false
         type: number
         default: 80
+      useRedis:
+        required: true
+        type: boolean
+        default: true
 
 jobs:
   audit:
@@ -42,7 +46,7 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ github.ref_name }}
   cargo-deny:
-    name: "License check"
+    name: 'License check'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -73,6 +77,16 @@ jobs:
   test:
     name: Test Suite
     runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: ${{ inputs.useRedis && 'redis' || ''}}
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
         with:
@@ -84,9 +98,11 @@ jobs:
           profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
+
       - uses: actions-rs/cargo@v1
         with:
           command: test
+
       - uses: actions/cache@v4
         with:
           path: |
@@ -142,6 +158,16 @@ jobs:
   coverage:
     name: Coverage
     runs-on: ubuntu-24.04
+    services:
+      redis:
+        image: ${{ inputs.useRedis && 'redis' || ''}}
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 6379:6379
     steps:
       - uses: actions/checkout@v4
       - uses: actions-rs/toolchain@v1
