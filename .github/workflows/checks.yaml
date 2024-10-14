@@ -190,9 +190,8 @@ jobs:
             cargo install cargo-tarpaulin
           fi
 
-          for crate_path in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.source == null) | .manifest_path | gsub("/Cargo.toml"; "")'); do
-            echo "Generating coverage for crate at $crate_path"
-            cd $crate_path
-            cargo tarpaulin --skip-clean --engine llvm --fail-under=${{ inputs.coverage }} --manifest-path $crate_path/Cargo.toml
-            cd -
+          for crate_name in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.source == null) | .name'); do
+            echo "Generating coverage for crate at $crate_name"
+            
+            cargo tarpaulin --skip-clean --engine llvm --fail-under=${{ inputs.coverage }} -p $crate_name
           done
