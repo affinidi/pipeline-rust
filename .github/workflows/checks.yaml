@@ -186,7 +186,12 @@ jobs:
           key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Generate code coverage
         run: |
-          if ! cargo tarpaulin --version; then
-            cargo install cargo-tarpaulin
+          if ! cargo llvm-cov --version; then
+            cargo install cargo-llvm-cov
           fi
-          cargo tarpaulin --skip-clean --engine llvm --fail-under=${{ inputs.coverage }} --workspace
+
+          for crate_name in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.source == null) | .name'); do
+            echo "Generating coverage for crate at $crate_name"
+            
+            cargo llvm-cov --package $crate_name --summary-only --fail-under-lines=${{ inputs.coverage }}
+          done
