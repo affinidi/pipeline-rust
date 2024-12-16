@@ -55,6 +55,7 @@ jobs:
           ref: ${{ github.head_ref }}
       - uses: EmbarkStudios/cargo-deny-action@v1
         with:
+          rust-version: "1.82.0"
           command: check bans licenses sources
   check:
     name: Cargo Check
