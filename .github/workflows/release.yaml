@@ -39,9 +39,6 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           override: true
 
-      - name: Build project
-        run: cargo build --release
-
       - uses: actions/cache@v4
         with:
           path: |
@@ -53,6 +50,9 @@ jobs:
           key: ${{ runner.os }}-cargo-release-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
           restore-keys: |
             ${{ runner.os }}-cargo-release-${{ github.ref_name }}
+
+      - name: Build project
+        run: cargo build --release
 
       - name: Release
         if: ${{ github.ref == 'refs/heads/main' }}
