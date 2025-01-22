@@ -22,6 +22,11 @@ jobs:
     runs-on: ubuntu-24.04
     environment: "release"
     steps:
+      - name: Free Disk Space (Ubuntu)
+        uses: insightsengineering/disk-space-reclaimer@v1
+        with:
+          tools-cache: true
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -64,3 +69,6 @@ jobs:
           cargo release --no-confirm --workspace ${{ inputs.release_dry_run && '--verbose' || '--verbose --execute' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Check disk usage after
+        run: df -h
