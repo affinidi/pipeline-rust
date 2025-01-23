@@ -34,17 +34,6 @@ jobs:
         with:
           # Comma separated list of issues to ignore (or configure in audit.toml)
           ignore: ${{ inputs.auditIgnore }}
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ github.ref_name }}
   cargo-deny:
     name: "License check"
     runs-on: ubuntu-24.04
@@ -65,14 +54,11 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: check
+      - run: cargo check
 
   test:
     name: Test Suite
@@ -92,25 +78,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
-      - uses: actions-rs/cargo@v1
-        with:
-          command: test
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ github.ref_name }}-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-${{ github.ref_name }}
+      - run: cargo test
+
   fmt:
     name: Rustfmt
     runs-on: ubuntu-24.04
@@ -119,16 +92,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
-      - run: rustup component add rustfmt
-      - uses: actions-rs/cargo@v1
-        with:
-          command: fmt
-          args: --all -- --check
+      - name: Rustfmt Check
+        uses: actions-rust-lang/rustfmt@v1
 
   clippy:
     name: Clippy
@@ -138,15 +107,12 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ inputs.toolchain }}
+          rustflags: ''
           override: true
-      - run: rustup component add clippy
-      - uses: actions-rs/cargo@v1
-        with:
-          command: clippy
+      - run: cargo clippy --no-deps
 
   wiz-scan:
     uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
@@ -170,20 +136,10 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rs/toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
-          profile: minimal
           toolchain: ${{ inputs.toolchain }}
           override: true
-      - uses: actions/cache@v4
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
       - name: Generate code coverage
         run: |
           if ! cargo llvm-cov --version; then
