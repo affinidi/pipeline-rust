@@ -53,7 +53,7 @@ jobs:
             cargo install cargo-release
           fi
           # '--verbose' was moved to the condition as if yes is '' in 'condition && yes || no' then no is picked (as condition && '' is false)
-          cargo release --no-confirm --workspace ${{ inputs.release_dry_run && '--verbose' || '--verbose --execute' }}
+          cargo release --no-confirm --workspace --unpublished ${{ inputs.release_dry_run && '--verbose' || '--verbose --execute' }}
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
