@@ -5,6 +5,10 @@ on:
         required: false
         type: string
         default: stable
+      cargoDenyRustVersion:
+        required: false
+        type: string
+        default: "1.85.0"
       auditIgnore:
         required: false
         type: string
@@ -42,9 +46,9 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: EmbarkStudios/cargo-deny-action@v1
+      - uses: EmbarkStudios/cargo-deny-action@v2
         with:
-          rust-version: "1.82.0"
+          rust-version: ${{ inputs.cargoDenyRustVersion }}
           command: check bans licenses sources
   check:
     name: Cargo Check
@@ -110,7 +114,7 @@ jobs:
       - uses: actions-rust-lang/setup-rust-toolchain@v1
         with:
           toolchain: ${{ inputs.toolchain }}
-          rustflags: ''
+          rustflags: ""
           override: true
       - run: cargo clippy --no-deps
 
