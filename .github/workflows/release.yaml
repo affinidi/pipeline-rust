@@ -99,9 +99,10 @@ jobs:
                   # local_version=${local_version#version: }
                   local_version=$(cargo info ${crate_name} | grep "version" | grep --invert-match "rust-version" | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 
-                  remote_version=$(cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name})
-                  remote_version=${remote_version%\"*#*}
-                  remote_version=${remote_version##${crate_name} = \"}
+                  # remote_version=$(cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name})
+                  # remote_version=${remote_version%\"*#*}
+                  # remote_version=${remote_version##${crate_name} = \"}
+                  remote_version=$(cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+')
 
                   if [[ "${debug}" == "true" ]]
                   then
