@@ -56,6 +56,11 @@ jobs:
           rustflags: ${{ inputs.rustflags }}
           override: true
 
+      - name: Install rust dependencies
+        run: |
+          apt update
+          apt install build-essential libdbus-1-dev libssl-dev
+
       - name: Build project
         run: cargo build --release
 
@@ -74,10 +79,6 @@ jobs:
       - name: Release
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
-          # install rust dependencies
-          apt update
-          apt install build-essential libdbus-1-dev libssl-dev
-
           debug="${{ inputs.release_debug }}"
           published_crates=0
           max_retries=${{ inputs.release_max_retries }}
