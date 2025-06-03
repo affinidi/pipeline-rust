@@ -5,6 +5,8 @@ outputs: {}
 runs:
   using: "composite"
   steps:
-    - run: |
+    - name: "install required Rust dependencies"
+      shell: bash
+      run: |
         sudo apt update
         sudo apt install build-essential libdbus-1-dev libssl-dev
