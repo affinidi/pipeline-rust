@@ -56,7 +56,7 @@ jobs:
           rustflags: ${{ inputs.rustflags }}
           override: true
 
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
 
       - name: Build project
         run: cargo build --release
