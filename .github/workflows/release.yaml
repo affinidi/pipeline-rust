@@ -56,10 +56,7 @@ jobs:
           rustflags: ${{ inputs.rustflags }}
           override: true
 
-      - name: Install rust dependencies
-        run: |
-          sudo apt update
-          sudo apt install build-essential libdbus-1-dev libssl-dev
+      - uses: ./.github/actions/rust-dependencies
 
       - name: Build project
         run: cargo build --release
