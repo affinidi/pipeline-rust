@@ -67,7 +67,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
       - run: cargo check
 
   test:
@@ -93,7 +93,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
       - run: cargo test
 
   fmt:
@@ -109,7 +109,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
 
@@ -126,7 +126,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
       - run: cargo clippy --no-deps
 
   wiz-scan:
@@ -156,7 +156,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
-      - uses: ./.github/actions/rust-dependencies
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies/action.yaml@main
       - name: Generate code coverage
         run: |
           if ! cargo llvm-cov --version; then
