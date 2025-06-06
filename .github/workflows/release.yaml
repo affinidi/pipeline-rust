@@ -114,7 +114,7 @@ jobs:
                   then
                       cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "Cannot fetch remote version"
                   fi
-                  remote_version=$(cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || "")
+                  remote_version=$(cargo search --limit 1 --quiet ${crate_name} | grep --before-context=0 --after-context=0 ${crate_name} | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' || echo "")
                   if [[ "${debug}" == "true" ]]
                   then
                       echo remote_version=${remote_version}
