@@ -89,15 +89,15 @@ jobs:
                   echo "Max retries (${max_retries}) reached, exiting."
                   if [[ ${#failed_crates[@]} -gt 0 ]]
                   then
-                      echo "Crates which were not published: [${failed_crates}]."
+                      echo "Crates which were not published: [${failed_crates[@]}]."
                   fi
                   exit 1
               fi
               retries=$((retries + 1))
-              echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates}]"
+              echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates[@]}]"
               if [[ ${#failed_crates[@]} -gt 0 ]]
               then
-                  echo "[${retries}/${max_retries}] Creates failed in the previous run: [${failed_crates}]"
+                  echo "[${retries}/${max_retries}] Creates failed in the previous run: [${failed_crates[@]}]"
               fi
               published_crates=()
               failed_crates=()
@@ -150,8 +150,8 @@ jobs:
                   fi
               done
           done
-          echo "Creates published in the current run: [${published_crates}]."
-          echo "Creates failed in the current run: [${failed_crates}]."
+          echo "Creates published in the current run: [${published_crates[@]}]."
+          echo "Creates failed in the current run: [${failed_crates[@]}]."
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
