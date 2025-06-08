@@ -77,20 +77,30 @@ jobs:
         if: ${{ github.ref == 'refs/heads/main' }}
         run: |
           debug="${{ inputs.release_debug }}"
-          published_crates=0
           max_retries=${{ inputs.release_max_retries }}
           retries=0
+          published_crates=()
+          failed_crates=()
 
-          while [[ $published_crates -gt 0 || $retries == 0 ]]
+          while [[ ${#published_crates[@]} -gt 0 || ${#failed_crates[@]} -gt 0 || $retries == 0 ]]
           do
               if [[ $retries == $max_retries ]]
               then
                   echo "Max retries (${max_retries}) reached, exiting."
+                  if [[ ${#failed_crates[@]} -gt 0 ]]
+                  then
+                      echo "Crates which were not published: [${failed_crates}]."
+                  fi
                   exit 1
               fi
               retries=$((retries + 1))
-              echo "[${retries}/${max_retries}] Creates published in previous run: ${published_crates}"
-              published_crates=0
+              echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates}]"
+              if [[ ${#failed_crates[@]} -gt 0 ]]
+              then
+                  echo "[${retries}/${max_retries}] Creates failed in the previous run: [${failed_crates}]"
+              fi
+              published_crates=()
+              failed_crates=()
               for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].manifest_path' | xargs dirname); do
                   echo "Publishing crate $crate..."
 
@@ -122,16 +132,26 @@ jobs:
 
                   if [[ "${local_version}" != "${remote_version}" ]]
                   then
-                      published_crates=$((published_crates + 1))
                       cd $crate
                       echo "Publishing ${crate_name}@${local_version}]..."
+                      set +e
                       cargo publish ${{ inputs.release_dry_run && '--dry-run' || '' }} || echo "Crate [${crate_name}] was probably already published."
+                      publish_exit_code=$?
+                      set -e
+                      if [[ "$publish_exit_code" == "0" ]]
+                      then
+                          published_crates+=($crate_name)
+                      else
+                          failed_crates+=($crate_name)
+                      fi
                       cd ..
                   else
                       echo "No release needed for ${crate_name} as version [${remote_version}] was already released."
                   fi
               done
           done
+          echo "Creates published in the current run: [${published_crates}]."
+          echo "Creates failed in the current run: [${failed_crates}]."
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
