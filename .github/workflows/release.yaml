@@ -135,7 +135,7 @@ jobs:
                       cd $crate
                       echo "Publishing ${crate_name}@${local_version}]..."
                       set +e
-                      cargo publish ${{ inputs.release_dry_run && '--dry-run' || '' }} || echo "Crate [${crate_name}] was probably already published."
+                      cargo publish ${{ inputs.release_dry_run && '--dry-run' || '' }}
                       publish_exit_code=$?
                       set -e
                       if [[ "$publish_exit_code" == "0" ]]
