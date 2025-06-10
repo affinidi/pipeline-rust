@@ -92,6 +92,13 @@ jobs:
                       echo "Crates which were not published: [${failed_crates[@]}]."
                   fi
                   exit 1
+              elif [[ $retries -gt 0 ]]
+              then
+                  if [[ ${#failed_crates[@]} -eq 0 ]]
+                  then
+                      echo "Seems all crates were published, exiting."
+                      exit 0
+                  fi
               fi
               retries=$((retries + 1))
               echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates[@]}]"
