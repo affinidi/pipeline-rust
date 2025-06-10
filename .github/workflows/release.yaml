@@ -79,6 +79,7 @@ jobs:
           debug="${{ inputs.release_debug }}"
           max_retries=${{ inputs.release_max_retries }}
           retries=0
+          all_published_crates=()
           published_crates=()
           failed_crates=()
 
@@ -89,6 +90,7 @@ jobs:
                   echo "Max retries (${max_retries}) reached, exiting."
                   if [[ ${#failed_crates[@]} -gt 0 ]]
                   then
+                      echo "Creates published in the current run: [${all_published_crates[@]}]."
                       echo "Crates which were not published: [${failed_crates[@]}]."
                   fi
                   exit 1
@@ -147,6 +149,10 @@ jobs:
                       set -e
                       if [[ "$publish_exit_code" == "0" ]]
                       then
+                          if [[ ! ${all_published_crates[@]} =~ $crate_name ]]
+                          then
+                              all_published_crates+=($crate_name)
+                          fi
                           published_crates+=($crate_name)
                       else
                           failed_crates+=($crate_name)
@@ -157,7 +163,7 @@ jobs:
                   fi
               done
           done
-          echo "Creates published in the current run: [${published_crates[@]}]."
+          echo "Creates published in the current run: [${all_published_crates[@]}]."
           echo "Creates failed in the current run: [${failed_crates[@]}]."
         env:
           CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
