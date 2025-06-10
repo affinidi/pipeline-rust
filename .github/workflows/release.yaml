@@ -96,14 +96,14 @@ jobs:
               then
                   if [[ ${#failed_crates[@]} -eq 0 ]]
                   then
-                      echo "Seems all crates were published, exiting."
-                      exit 0
+                      echo "Seems all crates were published."
+                      break
                   fi
               fi
               retries=$((retries + 1))
-              echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates[@]}]"
-              if [[ ${#failed_crates[@]} -gt 0 ]]
+              if [[ $retries -gt 1 ]]
               then
+                  echo "[${retries}/${max_retries}] Creates published in the previous run: [${published_crates[@]}]"
                   echo "[${retries}/${max_retries}] Creates failed in the previous run: [${failed_crates[@]}]"
               fi
               published_crates=()
