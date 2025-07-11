@@ -159,7 +159,8 @@ jobs:
                       fi
                       cd ..
                   else
-                      git tag --annotate "${crate_name}:${remote_version}" --message="Release tag for ${crate_name}:${remote_version}" || echo "Tag already exists"
+                      tag_version="${crate_name}-v${remote_version}"
+                      git tag --annotate "${tag_version}" --message="Release tag for ${tag_version}" || echo "Tag [${tag_version}] already exists"
                       echo "No release needed for ${crate_name} as version [${remote_version}] was already released."
                   fi
               done
