@@ -39,6 +39,15 @@ jobs:
       #   with:
       #     tools-cache: true
 
+      # https://github.com/actions/create-github-app-token
+      - uses: actions/create-github-app-token@v2
+        id: app-token
+        with:
+          # required
+          # app-id: ${{ vars.RELEASE_BOT_APP_ID }}
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
