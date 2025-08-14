@@ -109,6 +109,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
+          components: rustfmt
       - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1
@@ -126,6 +127,7 @@ jobs:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
           override: true
+          components: clippy
       - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
       - run: cargo clippy --no-deps
 
