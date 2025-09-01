@@ -40,7 +40,7 @@ on:
 jobs:
 
   rust-scan:
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@security-rust-scanner
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@fix/dart-pipeline-bug
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
