@@ -30,12 +30,6 @@ on:
         default: '.'
         type: string
         
-    secrets:
-      SNYK_SCANNER_TOKEN:
-        required: true
-      SNYK_SCANNER_REGION:
-        required: true
-
 jobs:
   audit:
     runs-on: ubuntu-latest

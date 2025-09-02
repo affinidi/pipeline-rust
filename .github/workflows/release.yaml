@@ -33,14 +33,10 @@ on:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
         required: false
-      SNYK_SCANNER_TOKEN:
-        required: true
-      SNYK_SCANNER_REGION:
-        required: true
 jobs:
 
   rust-scan:
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@fix/dart-pipeline-bug
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
