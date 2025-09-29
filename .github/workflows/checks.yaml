@@ -25,7 +25,11 @@ on:
         required: false
         type: boolean
         default: true
-
+      repo-path:
+        required: false
+        default: '.'
+        type: string
+        
 jobs:
   audit:
     runs-on: ubuntu-latest
@@ -134,7 +138,13 @@ jobs:
   wiz-scan:
     uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
     secrets: inherit
-
+  
+  rust-scan:
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    with:
+      repo-path: ${{ inputs.repo-path }}
+    secrets: inherit
+    
   coverage:
     name: Coverage
     runs-on: ubuntu-24.04
