@@ -35,7 +35,7 @@ on:
         required: false
 jobs:
   rust-scan:
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@SEC-3376-Rust-Security-Scanner
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
