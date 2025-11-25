@@ -1,0 +1,21 @@
+on:
+  workflow_call:
+    inputs:
+      cargoDenyRustVersion:
+        required: false
+        type: string
+        default: '1.85.0'
+
+jobs:
+  cargo-deny:
+    name: 'License check'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+      - uses: EmbarkStudios/cargo-deny-action@v2
+        with:
+          rust-version: ${{ inputs.cargoDenyRustVersion }}
+          command: check bans licenses sources
