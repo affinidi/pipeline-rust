@@ -38,26 +38,26 @@ on:
 jobs:
   audit:
     if: ${{ !contains(inputs.doNotInherit, 'audit') }}
-    uses: affinidi/pipeline-rust/.github/actions/audit/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/audit/action.yaml@FTL-24205
     with:
       auditIgnore: ${{ inputs.auditIgnore }}
 
   cargo-deny:
     if: ${{ !contains(inputs.doNotInherit, 'cargo-deny') }}
-    uses: affinidi/pipeline-rust/.github/actions/cargo-deny/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/cargo-deny/action.yaml@FTL-24205
     with:
       cargoDenyRustVersion: ${{ inputs.cargoDenyRustVersion }}
 
   check:
     if: ${{ !contains(inputs.doNotInherit, 'check') }}
-    uses: affinidi/pipeline-rust/.github/actions/cargo-check/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/cargo-check/action.yaml@FTL-24205
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
 
   test:
     if: ${{ !contains(inputs.doNotInherit, 'test') }}
-    uses: affinidi/pipeline-rust/.github/actions/test/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/test/action.yaml@FTL-24205
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
@@ -65,33 +65,33 @@ jobs:
 
   fmt:
     if: ${{ !contains(inputs.doNotInherit, 'fmt') }}
-    uses: affinidi/pipeline-rust/.github/actions/fmt/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/fmt/action.yaml@FTL-24205
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
 
   clippy:
     if: ${{ !contains(inputs.doNotInherit, 'clippy') }}
-    uses: affinidi/pipeline-rust/.github/actions/clippy/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/clippy/action.yaml@FTL-24205
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
 
   wiz-scan:
     if: ${{ !contains(inputs.doNotInherit, 'wiz-scan') }}
-    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
+    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@FTL-24205
     secrets: inherit
 
   rust-scan:
     if: ${{ !contains(inputs.doNotInherit, 'rust-scan') }}
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@FTL-24205
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
 
   coverage:
     if: ${{ !contains(inputs.doNotInherit, 'coverage') }}
-    uses: affinidi/pipeline-rust/.github/actions/coverage/action.yaml@main
+    uses: affinidi/pipeline-rust/.github/actions/coverage/action.yaml@FTL-24205
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
