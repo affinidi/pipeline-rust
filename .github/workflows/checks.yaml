@@ -8,15 +8,15 @@ on:
       rustflags:
         required: false
         type: string
-        default: ""
+        default: ''
       cargoDenyRustVersion:
         required: false
         type: string
-        default: "1.85.0"
+        default: '1.85.0'
       auditIgnore:
         required: false
         type: string
-        default: ""
+        default: ''
       coverage:
         required: false
         type: number
@@ -29,9 +29,15 @@ on:
         required: false
         default: '.'
         type: string
-        
+      skipJobs:
+        required: false
+        type: string
+        default: ''
+        description: 'Comma-separated list of jobs to skip (e.g., "audit,cargo-deny,wiz-scan")'
+
 jobs:
   audit:
+    if: ${{ !contains(inputs.skipJobs, 'audit') }}
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -47,7 +53,8 @@ jobs:
           # Comma separated list of issues to ignore (or configure in audit.toml)
           ignore: ${{ inputs.auditIgnore }}
   cargo-deny:
-    name: "License check"
+    if: ${{ !contains(inputs.skipJobs, 'cargo-deny') }}
+    name: 'License check'
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4
@@ -59,6 +66,7 @@ jobs:
           rust-version: ${{ inputs.cargoDenyRustVersion }}
           command: check bans licenses sources
   check:
+    if: ${{ !contains(inputs.skipJobs, 'check') }}
     name: Cargo Check
     runs-on: ubuntu-24.04
     steps:
@@ -75,6 +83,7 @@ jobs:
       - run: cargo check
 
   test:
+    if: ${{ !contains(inputs.skipJobs, 'test') }}
     name: Test Suite
     runs-on: ubuntu-24.04
     services:
@@ -101,6 +110,7 @@ jobs:
       - run: cargo test
 
   fmt:
+    if: ${{ !contains(inputs.skipJobs, 'fmt') }}
     name: Rustfmt
     runs-on: ubuntu-24.04
     steps:
@@ -119,6 +129,7 @@ jobs:
         uses: actions-rust-lang/rustfmt@v1
 
   clippy:
+    if: ${{ !contains(inputs.skipJobs, 'clippy') }}
     name: Clippy
     runs-on: ubuntu-24.04
     steps:
@@ -136,16 +147,19 @@ jobs:
       - run: cargo clippy --no-deps
 
   wiz-scan:
+    if: ${{ !contains(inputs.skipJobs, 'wiz-scan') }}
     uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
     secrets: inherit
-  
+
   rust-scan:
+    if: ${{ !contains(inputs.skipJobs, 'rust-scan') }}
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
-    
+
   coverage:
+    if: ${{ !contains(inputs.skipJobs, 'coverage') }}
     name: Coverage
     runs-on: ubuntu-24.04
     services:
