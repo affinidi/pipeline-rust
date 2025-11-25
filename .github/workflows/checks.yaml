@@ -79,12 +79,12 @@ jobs:
 
   wiz-scan:
     if: ${{ !contains(inputs.doNotInherit, 'wiz-scan') }}
-    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@FTL-24205
+    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
     secrets: inherit
 
   rust-scan:
     if: ${{ !contains(inputs.doNotInherit, 'rust-scan') }}
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@FTL-24205
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
     with:
       repo-path: ${{ inputs.repo-path }}
     secrets: inherit
