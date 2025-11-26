@@ -20,14 +20,14 @@ on:
 
 jobs:
   test:
-    uses: affinidi/pipeline-rust/.github/workflows/test.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/test.yaml@main
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       useRedis: ${{ inputs.useRedis }}
 
   coverage:
-    uses: affinidi/pipeline-rust/.github/workflows/coverage.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/coverage.yaml@main
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}

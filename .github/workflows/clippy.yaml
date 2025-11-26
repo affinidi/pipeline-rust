@@ -25,5 +25,5 @@ jobs:
           rustflags: ${{ inputs.rustflags }}
           override: true
           components: clippy
-      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@FTL-24205
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
       - run: cargo clippy --no-deps

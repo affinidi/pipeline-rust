@@ -25,6 +25,6 @@ jobs:
           rustflags: ${{ inputs.rustflags }}
           override: true
           components: rustfmt
-      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@FTL-24205
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
       - name: Rustfmt Check
         uses: actions-rust-lang/rustfmt@v1

@@ -24,29 +24,29 @@ on:
 
 jobs:
   audit:
-    uses: affinidi/pipeline-rust/.github/workflows/audit.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/audit.yaml@main
     with:
       auditIgnore: ${{ inputs.auditIgnore }}
 
   cargo-deny:
-    uses: affinidi/pipeline-rust/.github/workflows/cargo-deny.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/cargo-deny.yaml@main
     with:
       cargoDenyRustVersion: ${{ inputs.cargoDenyRustVersion }}
 
   check:
-    uses: affinidi/pipeline-rust/.github/workflows/cargo-check.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/cargo-check.yaml@main
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
 
   fmt:
-    uses: affinidi/pipeline-rust/.github/workflows/fmt.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/fmt.yaml@main
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
 
   clippy:
-    uses: affinidi/pipeline-rust/.github/workflows/clippy.yaml@FTL-24205
+    uses: affinidi/pipeline-rust/.github/workflows/clippy.yaml@main
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
