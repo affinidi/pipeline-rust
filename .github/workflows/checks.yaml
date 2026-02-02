@@ -31,8 +31,8 @@ on:
         default: true
       repo-path:
         required: false
-        default: "."
         type: string
+        default: "."
 
 jobs:
   audit:

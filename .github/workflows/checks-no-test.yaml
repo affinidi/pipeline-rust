@@ -23,8 +23,8 @@ on:
         default: ""
       repo-path:
         required: false
-        default: "."
         type: string
+        default: "."
 
 jobs:
   audit:

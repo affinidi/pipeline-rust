@@ -31,8 +31,8 @@ on:
         default: ""
       repo-path:
         required: false
-        default: "."
         type: string
+        default: "."
     secrets:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
