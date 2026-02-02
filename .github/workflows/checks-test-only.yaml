@@ -12,6 +12,7 @@ on:
       ubuntu-rust-deps:
         required: false
         type: string
+        default: libdbus-1-dev libssl-dev
       coverage:
         required: false
         type: number
