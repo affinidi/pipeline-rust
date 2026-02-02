@@ -1,0 +1,80 @@
+on:
+  workflow_call:
+    inputs:
+      toolchain:
+        required: false
+        type: string
+        default: stable
+      rustflags:
+        required: false
+        type: string
+        default: ""
+      ubuntu-rust-deps:
+        required: false
+        type: string
+        default: libdbus-1-dev libssl-dev
+
+jobs:
+  deprecation-check:
+    name: Deprecation Check
+    runs-on: ubuntu-24.04
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ github.head_ref }}
+      - uses: actions-rust-lang/setup-rust-toolchain@v1
+        with:
+          toolchain: ${{ inputs.toolchain }}
+          # Preserve caller's flags and enable deprecation warnings
+          rustflags: "${{ inputs.rustflags }} -W deprecated"
+          override: true
+      - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
+        with:
+          ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      - name: Check for deprecations
+        id: deprecations
+        run: |
+          # Run cargo check and capture output
+          output=$(cargo check --all-targets 2>&1) || true
+
+          # Extract deprecation warnings
+          deprecations=$(echo "$output" | grep -iE "warning.*deprecat" || true)
+
+          if [ -n "$deprecations" ]; then
+            echo "found=true" >> $GITHUB_OUTPUT
+            # Escape for multiline output
+            {
+              echo 'warnings<<EOF'
+              echo "$deprecations"
+              echo 'EOF'
+            } >> $GITHUB_OUTPUT
+          else
+            echo "found=false" >> $GITHUB_OUTPUT
+          fi
+      - name: Comment on PR
+        if: steps.deprecations.outputs.found == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Check if we already commented (avoid spam on re-runs)
+          existing=$(gh pr view ${{ github.event.pull_request.number }} --comments --json comments \
+            -q '.comments[] | select(.body | contains("## Deprecation Warnings")) | .id' | head -1)
+
+          body="## Deprecation Warnings
+
+          The following deprecation warnings were found. These are informational and don't block the PR.
+
+          \`\`\`
+          ${{ steps.deprecations.outputs.warnings }}
+          \`\`\`
+
+          Consider addressing these in a future PR."
+
+          if [ -n "$existing" ]; then
+            echo "Deprecation comment already exists, skipping"
+          else
+            gh pr comment ${{ github.event.pull_request.number }} --body "$body"
+          fi

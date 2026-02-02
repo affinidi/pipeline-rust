@@ -33,6 +33,14 @@ on:
         required: false
         type: string
         default: "."
+      verifyPublish:
+        required: false
+        type: boolean
+        default: false
+      deprecationCheck:
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   audit:
@@ -92,3 +100,19 @@ jobs:
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       coverage: ${{ inputs.coverage }}
       useRedis: ${{ inputs.useRedis }}
+
+  verify-publish:
+    if: ${{ inputs.verifyPublish }}
+    uses: affinidi/pipeline-rust/.github/workflows/verify-publish.yaml@main
+    with:
+      toolchain: ${{ inputs.toolchain }}
+      rustflags: ${{ inputs.rustflags }}
+      ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+
+  deprecation-check:
+    if: ${{ inputs.deprecationCheck }}
+    uses: affinidi/pipeline-rust/.github/workflows/deprecation-check.yaml@main
+    with:
+      toolchain: ${{ inputs.toolchain }}
+      rustflags: ${{ inputs.rustflags }}
+      ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
