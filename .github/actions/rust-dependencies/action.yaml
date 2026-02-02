@@ -1,6 +1,11 @@
 name: "Install Rust Dependencies"
 description: "install Rust dependencies"
-inputs: {}
+inputs:
+  additional-libs:
+    required: false
+    type: string
+    default: libdbus-1-dev libssl-dev chafa
+
 outputs: {}
 runs:
   using: "composite"
@@ -9,4 +14,4 @@ runs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install build-essential libdbus-1-dev libssl-dev chafa
+        sudo apt install build-essential ${{ inputs.additional-libs }}
