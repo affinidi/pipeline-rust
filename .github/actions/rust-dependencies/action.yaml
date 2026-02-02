@@ -1,7 +1,7 @@
 name: "Install Rust Dependencies"
 description: "install Rust dependencies"
 inputs:
-  additional-libs:
+  ubuntu-rust-deps:
     required: false
     type: string
     default: libdbus-1-dev libssl-dev
@@ -14,4 +14,4 @@ runs:
       shell: bash
       run: |
         sudo apt update
-        sudo apt install build-essential ${{ inputs.additional-libs }}
+        sudo apt install build-essential ${{ inputs.ubuntu-rust-deps }}
