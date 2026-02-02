@@ -9,6 +9,10 @@ on:
         required: false
         type: string
         default: ""
+      ubuntu-rust-deps:
+        required: false
+        type: string
+        default: libdbus-1-dev libssl-dev
       release_dry_run:
         required: false
         type: boolean
@@ -27,8 +31,8 @@ on:
         default: ""
       repo-path:
         required: false
-        default: "."
         type: string
+        default: "."
     secrets:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
@@ -79,6 +83,8 @@ jobs:
           override: true
 
       - uses: affinidi/pipeline-rust/.github/actions/rust-dependencies@main
+        with:
+          ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
 
       - name: Build project
         run: cargo build --release

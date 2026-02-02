@@ -8,7 +8,11 @@ on:
       rustflags:
         required: false
         type: string
-        default: ''
+        default: ""
+      ubuntu-rust-deps:
+        required: false
+        type: string
+        default: libdbus-1-dev libssl-dev
       coverage:
         required: false
         type: number
@@ -24,6 +28,7 @@ jobs:
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
+      ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       useRedis: ${{ inputs.useRedis }}
 
   coverage:
@@ -31,5 +36,6 @@ jobs:
     with:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
+      ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       coverage: ${{ inputs.coverage }}
       useRedis: ${{ inputs.useRedis }}
