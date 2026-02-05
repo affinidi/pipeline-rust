@@ -194,7 +194,7 @@ jobs:
                       fi
                       cd ..
 
-                      tag_version="${crate_name}-v${remote_version}"
+                      tag_version="${crate_name}-v${local_version}"
                       git tag --annotate "${tag_version}" --message="Release tag for ${tag_version}" || echo "Tag [${tag_version}] already exists"
                   else
                       echo "No release needed for ${crate_name} as version [${remote_version}] was already released."
