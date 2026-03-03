@@ -33,6 +33,11 @@ on:
         required: false
         type: string
         default: "."
+      workspace_publish:
+        description: "Use cargo publish --workspace (requires Rust 1.90+, path deps, workspace inheritance)"
+        required: false
+        type: boolean
+        default: false
     secrets:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
@@ -108,9 +113,30 @@ jobs:
       #   env:
       #     CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
 
-      # temporarily switched to publish as release does not work for already published crates
-      - name: Release
-        if: ${{ github.ref == 'refs/heads/main' }}
+      # --- workspace publish path (cargo publish --workspace) ---
+      - name: Publish workspace
+        if: ${{ github.ref == 'refs/heads/main' && inputs.workspace_publish }}
+        run: cargo publish --workspace ${{ inputs.release_dry_run && '--dry-run' || '' }}
+        env:
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+
+      - name: Tag published crates
+        if: ${{ github.ref == 'refs/heads/main' && inputs.workspace_publish && !inputs.release_dry_run }}
+        run: |
+          for pkg in $(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.publish != []) | "\(.name)@\(.version)"'); do
+            name="${pkg%%@*}"
+            version="${pkg##*@}"
+            tag="${name}-v${version}"
+            if ! git rev-parse "$tag" >/dev/null 2>&1; then
+              git tag --annotate "$tag" --message="Release ${name} v${version}"
+              echo "Tagged: $tag"
+            fi
+          done
+
+      # --- legacy per-crate publish path (pre-1.90 or no workspace inheritance) ---
+      - name: Release (legacy)
+        if: ${{ github.ref == 'refs/heads/main' && !inputs.workspace_publish }}
         run: |
           debug="${{ inputs.release_debug }}"
           max_retries=${{ inputs.release_max_retries }}
