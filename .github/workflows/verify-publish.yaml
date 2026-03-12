@@ -35,7 +35,7 @@ jobs:
         run: |
           echo "Verifying all workspace crates can be packaged..."
           failed=""
-          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[].name'); do
+          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.publish == null) | .name'); do
             echo -n "Checking $crate... "
             # Suppress deprecation warnings during package check
             if output=$(RUSTFLAGS="${{ inputs.rustflags }} -A deprecated" cargo package -p "$crate" --allow-dirty 2>&1); then
