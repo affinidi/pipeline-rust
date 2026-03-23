@@ -48,6 +48,9 @@ jobs:
     needs: [rust-scan]
     runs-on: ubuntu-24.04
     environment: "release"
+    permissions:
+      id-token: write  # required for OIDC trusted publishing
+      contents: write
     steps:
       # - name: Free Disk Space (Ubuntu)
       #   uses: insightsengineering/disk-space-reclaimer@v1
@@ -88,6 +91,11 @@ jobs:
 
       - name: Build project
         run: cargo build --release
+
+      - name: Authenticate to crates.io (OIDC trusted publishing)
+        id: auth
+        uses: rust-lang/crates-io-auth-action@v1
+        continue-on-error: true  # falls back to CARGO_REGISTRY_TOKEN secret if trusted publisher not configured
 
       # - name: Release
       #   if: ${{ github.ref == 'refs/heads/main' }}
@@ -204,7 +212,7 @@ jobs:
           echo "Creates published in the current run: [${all_published_crates[@]}]."
           echo "Creates failed in the current run: [${failed_crates[@]}]."
         env:
-          CARGO_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
+          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
 
       - name: Push Tags
