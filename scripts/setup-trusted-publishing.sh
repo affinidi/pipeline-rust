@@ -11,7 +11,8 @@
 
 set -euo pipefail
 
-API="https://crates.io/api/v1/trusted_publishing/github_configs"
+API_BASE="https://crates.io/api/v1"
+API_TP="${API_BASE}/trusted_publishing"
 DRY_RUN=false
 REPO_PATH="."
 
@@ -72,7 +73,14 @@ SUCCESS=0 SKIPPED=0 FAILED=0
 for CRATE in "${CRATES[@]}"; do
     echo "── $CRATE"
 
-    EXISTING=$(crates_io "${API}?crate=${CRATE}" | jq '.github_configs | length')
+    # Crate existence determines the endpoint (also the JSON response key)
+    if [[ $(crates_io --output /dev/null --write-out "%{http_code}" "${API_BASE}/crates/${CRATE}") == "200" ]]; then
+        ENDPOINT="github_configs";         KIND="active"
+    else
+        ENDPOINT="pending_github_configs"; KIND="pending (new crate)"
+    fi
+
+    EXISTING=$(crates_io "${API_TP}/${ENDPOINT}?crate=${CRATE}" | jq ".${ENDPOINT} | length")
     if [[ "$EXISTING" -gt 0 ]]; then
         echo "   skipped — already configured"; (( SKIPPED++ )); continue
     fi
@@ -81,17 +89,17 @@ for CRATE in "${CRATES[@]}"; do
         '{github_config: ($base + {crate: $crate})}')
 
     if [[ "$DRY_RUN" == true ]]; then
-        echo "   [dry-run] would POST: ${PAYLOAD}"; (( SUCCESS++ )); continue
+        echo "   [dry-run] would POST ${KIND}: ${PAYLOAD}"; (( SUCCESS++ )); continue
     fi
 
-    read -r -p "   Register trusted publisher for '${CRATE}'? [y/N] " REPLY
+    read -r -p "   Register ${KIND} trusted publisher for '${CRATE}'? [y/N] " REPLY
     if [[ ! "$REPLY" =~ ^[yY]$ ]]; then
         echo "   skipped by user"; (( SKIPPED++ )); continue
     fi
 
-    HTTP=$(crates_io --output /dev/null --write-out "%{http_code}" --request POST --data "$PAYLOAD" "$API")
+    HTTP=$(crates_io --output /dev/null --write-out "%{http_code}" --request POST --data "$PAYLOAD" "${API_TP}/${ENDPOINT}")
     if [[ "$HTTP" =~ ^20[01]$ ]]; then
-        echo "   registered (HTTP ${HTTP})"; (( SUCCESS++ ))
+        echo "   registered ${KIND} (HTTP ${HTTP})"; (( SUCCESS++ ))
     else
         echo "   FAILED (HTTP ${HTTP})" >&2; (( FAILED++ ))
     fi
