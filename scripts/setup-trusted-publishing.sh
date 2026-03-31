@@ -1,140 +1,99 @@
 #!/usr/bin/env bash
-# Registers crates.io Trusted Publishing (OIDC) for every publishable crate in this workspace.
+# Registers crates.io Trusted Publishing (OIDC) for every publishable crate in workspace
 #
-# Usage:
-#   CARGO_REGISTRY_TOKEN=<token> ./scripts/setup-trusted-publishing.sh [options]
+# Usage:  ./scripts/setup-trusted-publishing.sh [--dry-run] [repo-path]
 #
-# Options:
-#   --owner        GitHub org/user owning the repo  (default: affinidi)
-#   --repo         GitHub repository name           (default: affinidi-tdk-rs)
-#   --workflow     Workflow filename in .github/workflows/ (default: release.yaml)
-#   --environment  GitHub Actions environment name  (default: release)
-#   --dry-run      Print what would be done without calling the API
+# Prompts for your crates.io API token (masked) and detects the GitHub
+# owner/repo from the Git remote.  Workflow and environment are fixed to
+# release.yaml / release.
 #
-# Requires: cargo, jq, curl
-# The CARGO_REGISTRY_TOKEN must have the 'publish-new' or 'publish-update' scope.
+# Requires: cargo, jq, curl, git
 
 set -euo pipefail
 
-# ---------- defaults ---------------------------------------------------------
-OWNER="affinidi"
-REPO="affinidi-tdk-rs"
-WORKFLOW="release.yaml"
-ENVIRONMENT="release"
+API="https://crates.io/api/v1/trusted_publishing/github_configs"
 DRY_RUN=false
-API_BASE="https://crates.io/api/v1"
+REPO_PATH="."
 
 # ---------- arg parsing ------------------------------------------------------
 while [[ $# -gt 0 ]]; do
     case "$1" in
-        --owner)       OWNER="$2";       shift 2 ;;
-        --repo)        REPO="$2";        shift 2 ;;
-        --workflow)    WORKFLOW="$2";    shift 2 ;;
-        --environment) ENVIRONMENT="$2"; shift 2 ;;
-        --dry-run)     DRY_RUN=true;     shift   ;;
-        *) echo "Unknown option: $1" >&2; exit 1  ;;
+        --dry-run) DRY_RUN=true; shift ;;
+        -*)        echo "Unknown option: $1" >&2; exit 1 ;;
+        *)         REPO_PATH="$1"; shift ;;
     esac
 done
 
 # ---------- pre-flight -------------------------------------------------------
-if [[ -z "${CARGO_REGISTRY_TOKEN:-}" ]]; then
-    echo "Error: CARGO_REGISTRY_TOKEN is not set." >&2
-    exit 1
-fi
-
-for cmd in cargo jq curl; do
-    if ! command -v "$cmd" > /dev/null 2>&1; then
-        echo "Error: required command '$cmd' not found." >&2
-        exit 1
-    fi
+for cmd in cargo jq curl git; do
+    command -v "$cmd" >/dev/null 2>&1 || { echo "Error: '$cmd' not found." >&2; exit 1; }
 done
 
-# ---------- discover publishable crates --------------------------------------
-echo "Discovering publishable crates in workspace..."
+read -r -s -p "Enter crates.io API token: " TOKEN; echo
+[[ -n "$TOKEN" ]] || { echo "Error: token cannot be empty." >&2; exit 1; }
 
+# Resolve owner/repo from git remote (SSH or HTTPS)
+REMOTE=$(git -C "$REPO_PATH" remote get-url origin 2>/dev/null) \
+    || { echo "Error: no 'origin' remote in '${REPO_PATH}'." >&2; exit 1; }
+REMOTE="${REMOTE#*github.com?}"   # strip everything up to and including github.com: or /
+REMOTE="${REMOTE%.git}"
+OWNER="${REMOTE%%/*}"
+REPO="${REMOTE#*/}"
+[[ -n "$OWNER" && -n "$REPO" ]] \
+    || { echo "Error: cannot parse owner/repo from remote." >&2; exit 1; }
+
+echo "Repository: ${OWNER}/${REPO}"
+
+# ---------- helpers ----------------------------------------------------------
+crates_io() { curl --silent --show-error -H "Authorization: Bearer ${TOKEN}" -H "Content-Type: application/json" "$@"; }
+
+# ---------- discover publishable crates --------------------------------------
+echo "Discovering publishable crates…"
 mapfile -t CRATES < <(
-    cargo metadata --format-version=1 --no-deps \
+    cargo metadata --format-version=1 --no-deps --manifest-path "${REPO_PATH}/Cargo.toml" \
         | jq -r '.packages[] | select(.publish == null or .publish != []) | .name' \
         | sort
 )
+[[ ${#CRATES[@]} -gt 0 ]] || { echo "No publishable crates found." >&2; exit 1; }
 
-if [[ ${#CRATES[@]} -eq 0 ]]; then
-    echo "No publishable crates found." >&2
-    exit 1
-fi
-
-echo "Found ${#CRATES[@]} publishable crate(s):"
+echo "Found ${#CRATES[@]} crate(s):"
 printf '  %s\n' "${CRATES[@]}"
 echo
 
+# Build the repo-level part of the payload once
+BASE=$(jq --null-input \
+    --arg owner "$OWNER" --arg repo "$REPO" \
+    --arg wf "release.yaml" --arg env "release" \
+    '{repository_owner:$owner, repository_name:$repo, workflow_filename:$wf, environment:$env}')
+
 # ---------- register each crate ----------------------------------------------
-SUCCESS=0
-SKIPPED=0
-FAILED=0
+SUCCESS=0 SKIPPED=0 FAILED=0
 
 for CRATE in "${CRATES[@]}"; do
     echo "── $CRATE"
 
-    # Check if a config already exists for this crate
-    EXISTING=$(
-        curl --silent --show-error --fail \
-            --header "Authorization: Bearer ${CARGO_REGISTRY_TOKEN}" \
-            --header "Content-Type: application/json" \
-            "${API_BASE}/trusted_publishing/github_configs?crate=${CRATE}" \
-        | jq '.github_configs | length'
-    )
-
+    EXISTING=$(crates_io "${API}?crate=${CRATE}" | jq '.github_configs | length')
     if [[ "$EXISTING" -gt 0 ]]; then
-        echo "   skipped — trusted publisher already configured"
-        SKIPPED=$((SKIPPED + 1))
-        continue
+        echo "   skipped — already configured"; (( SKIPPED++ )); continue
     fi
 
-    PAYLOAD=$(jq --null-input \
-        --arg crate       "$CRATE" \
-        --arg owner       "$OWNER" \
-        --arg repo        "$REPO" \
-        --arg workflow    "$WORKFLOW" \
-        --arg environment "$ENVIRONMENT" \
-        '{
-            github_config: {
-                crate:              $crate,
-                repository_owner:   $owner,
-                repository_name:    $repo,
-                workflow_filename:  $workflow,
-                environment:        $environment
-            }
-        }'
-    )
+    PAYLOAD=$(jq --null-input --arg crate "$CRATE" --argjson base "$BASE" \
+        '{github_config: ($base + {crate: $crate})}')
 
-    if [[ "$DRY_RUN" == "true" ]]; then
-        echo "   [dry-run] would POST: ${PAYLOAD}"
-        SUCCESS=$((SUCCESS + 1))
-        continue
+    if [[ "$DRY_RUN" == true ]]; then
+        echo "   [dry-run] would POST: ${PAYLOAD}"; (( SUCCESS++ )); continue
     fi
 
     read -r -p "   Register trusted publisher for '${CRATE}'? [y/N] " REPLY
-    if [[ "$REPLY" != "y" ]] && [[ "$REPLY" != "Y" ]]; then
-        echo "   skipped by user"
-        SKIPPED=$((SKIPPED + 1))
-        continue
+    if [[ ! "$REPLY" =~ ^[yY]$ ]]; then
+        echo "   skipped by user"; (( SKIPPED++ )); continue
     fi
 
-    HTTP_STATUS=$(
-        curl --silent --output /dev/null --write-out "%{http_code}" \
-            --request POST \
-            --header "Authorization: Bearer ${CARGO_REGISTRY_TOKEN}" \
-            --header "Content-Type: application/json" \
-            --data "$PAYLOAD" \
-            "${API_BASE}/trusted_publishing/github_configs"
-    )
-
-    if [[ "$HTTP_STATUS" == "200" ]] || [[ "$HTTP_STATUS" == "201" ]]; then
-        echo "   registered (HTTP ${HTTP_STATUS})"
-        SUCCESS=$((SUCCESS + 1))
+    HTTP=$(crates_io --output /dev/null --write-out "%{http_code}" --request POST --data "$PAYLOAD" "$API")
+    if [[ "$HTTP" =~ ^20[01]$ ]]; then
+        echo "   registered (HTTP ${HTTP})"; (( SUCCESS++ ))
     else
-        echo "   FAILED (HTTP ${HTTP_STATUS})" >&2
-        FAILED=$((FAILED + 1))
+        echo "   FAILED (HTTP ${HTTP})" >&2; (( FAILED++ ))
     fi
 done
 

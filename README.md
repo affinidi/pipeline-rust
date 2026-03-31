@@ -50,8 +50,9 @@ Run once per repository or when adding new crate (requires a crates.io API token
 ```bash
 git clone https://github.com/affinidi/pipeline-rust
 cd pipeline-rust
-cp ./scripts/setup-trusted-publishing.sh ../repo-rs/
- CARGO_REGISTRY_TOKEN=<token> ./scripts/setup-trusted-publishing.sh --owner <org> --repo <repo>
+# or 
+curl https://raw.githubusercontent.com/affinidi/pipeline-rust/refs/main/scripts/setup-trusted-publishing.sh | bash
+./scripts/setup-trusted-publishing.sh ~/path/to-repo-rs/ --dry-run
 ```
 
 Use `--dry-run` to preview without making changes.
