@@ -40,3 +40,19 @@ jobs:
     with:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
 ```
+
+## Publishing new crate
+
+The release pipeline uses [crates.io Trusted Publishing](https://crates.io/docs/trusted-publishing) — no `CARGO_REGISTRY_TOKEN` secret needed once configured.
+
+Run once per repository or when adding new crate (requires a crates.io API token):
+
+```bash
+git clone https://github.com/affinidi/pipeline-rust
+cd pipeline-rust
+# or 
+curl https://raw.githubusercontent.com/affinidi/pipeline-rust/refs/main/scripts/setup-trusted-publishing.sh | bash
+./scripts/setup-trusted-publishing.sh ~/path/to-repo-rs/ --dry-run
+```
+
+Use `--dry-run` to preview without making changes.
