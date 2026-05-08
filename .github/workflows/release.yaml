@@ -239,7 +239,7 @@ jobs:
 
                   echo "Publishing crate $crate..."
 
-                  crate_name=${crate##*/}
+                  crate_name=$(cargo metadata --no-deps --format-version 1 --manifest-path "${crate}/Cargo.toml" | jq -r '.packages[0].name')
                   if [[ "${debug}" == "true" ]]
                   then
                       echo "crate_name=${crate_name}"
