@@ -239,7 +239,19 @@ jobs:
 
                   echo "Publishing crate $crate..."
 
-                  crate_name=$(cargo metadata --no-deps --format-version 1 --manifest-path "${crate}/Cargo.toml" | jq -r '.packages[0].name')
+                  # Use `cargo read-manifest` to read [package].name from the
+                  # specified Cargo.toml only. `cargo metadata --no-deps
+                  # --manifest-path X` expands to ALL workspace members when X
+                  # belongs to a workspace, so `.packages[0].name` always
+                  # returned the first declared workspace member regardless of
+                  # which crate we were processing — every iteration treated
+                  # the loop body as if it were the first crate, comparing
+                  # that crate's local vs remote and skipping the publish for
+                  # everything else. `read-manifest` reads the single TOML
+                  # without workspace expansion, while still honouring PR #74's
+                  # original intent that [package].name (not the directory
+                  # name) is the source of truth.
+                  crate_name=$(cargo read-manifest --manifest-path "${crate}/Cargo.toml" | jq -r '.name')
                   if [[ "${debug}" == "true" ]]
                   then
                       echo "crate_name=${crate_name}"
