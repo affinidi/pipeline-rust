@@ -82,10 +82,6 @@ jobs:
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
 
-  wiz-scan:
-    uses: affinidi/pipeline-security/.github/workflows/wizcli-dirscan.yml@main
-    secrets: inherit
-
   rust-scan:
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
     with:
