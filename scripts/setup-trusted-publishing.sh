@@ -3,9 +3,9 @@
 #
 # Usage:  ./scripts/setup-trusted-publishing.sh [--dry-run] [repo-path]
 #
-# Prompts for your crates.io API token (masked) and detects the GitHub
-# owner/repo from the Git remote.  Workflow and environment are fixed to
-# release.yaml / release.
+# Reads the crates.io API token from $CRATES_IO_TOKEN if set, otherwise
+# prompts interactively (masked).  Detects the GitHub owner/repo from the
+# Git remote.  Workflow and environment are fixed to release.yaml / release.
 #
 # Requires: cargo, jq, curl, git
 
@@ -30,7 +30,15 @@ for cmd in cargo jq curl git; do
     command -v "$cmd" >/dev/null 2>&1 || { echo "Error: '$cmd' not found." >&2; exit 1; }
 done
 
-read -r -s -p "Enter crates.io API token: " TOKEN; echo
+if [[ -n "${CRATES_IO_TOKEN:-}" ]]; then
+    TOKEN="$CRATES_IO_TOKEN"
+    echo "Using token from CRATES_IO_TOKEN environment variable."
+elif [[ -n "${CARGO_REGISTRY_TOKEN:-}" ]]; then
+    TOKEN="$CARGO_REGISTRY_TOKEN"
+    echo "Using token from CARGO_REGISTRY_TOKEN environment variable."
+else
+    read -r -s -p "Enter crates.io API token: " TOKEN; echo
+fi
 [[ -n "$TOKEN" ]] || { echo "Error: token cannot be empty." >&2; exit 1; }
 
 # Resolve owner/repo from git remote (SSH or HTTPS)
@@ -68,44 +76,74 @@ BASE=$(jq --null-input \
     '{repository_owner:$owner, repository_name:$repo, workflow_filename:$wf, environment:$env}')
 
 # ---------- register each crate ----------------------------------------------
-SUCCESS=0 SKIPPED=0 FAILED=0
+SUCCESS=0 SKIPPED=0 FAILED=0 PUBLISHED=0
 
 for CRATE in "${CRATES[@]}"; do
     echo "── $CRATE"
 
-    # Crate existence determines the endpoint (also the JSON response key)
-    if [[ $(crates_io --output /dev/null --write-out "%{http_code}" "${API_BASE}/crates/${CRATE}") == "200" ]]; then
-        ENDPOINT="github_configs";         KIND="active"
-    else
-        ENDPOINT="pending_github_configs"; KIND="pending (new crate)"
+    # Small delay to stay within crates.io rate limits (1 req/s)
+    sleep 1
+
+    # Check if crate exists on crates.io
+    HTTP_STATUS=$(crates_io --output /dev/null --write-out "%{http_code}" "${API_BASE}/crates/${CRATE}") || true
+    if [[ "$HTTP_STATUS" == "404" ]]; then
+        # Crate not yet on crates.io — do initial publish with token
+        if [[ "$DRY_RUN" == true ]]; then
+            echo "   [dry-run] would cargo publish -p ${CRATE} (first publish)"; (( PUBLISHED++ )) || true
+        else
+            read -r -p "   Not yet on crates.io. Publish '${CRATE}' with token? [y/N] " REPLY
+            if [[ ! "$REPLY" =~ ^[yY]$ ]]; then
+                echo "   skipped by user"; (( SKIPPED++ )) || true; continue
+            fi
+            echo "   publishing ${CRATE}…"
+            if CARGO_REGISTRY_TOKEN="$TOKEN" cargo publish -p "$CRATE" --manifest-path "${REPO_PATH}/Cargo.toml" 2>&1; then
+                echo "   published successfully"; (( PUBLISHED++ )) || true
+                # Wait for crates.io to index the new crate
+                echo "   waiting for crates.io to index…"
+                sleep 10
+            else
+                echo "   FAILED to publish" >&2; (( FAILED++ )) || true; continue
+            fi
+        fi
+    elif [[ "$HTTP_STATUS" != "200" ]]; then
+        echo "   FAILED — crate lookup returned HTTP ${HTTP_STATUS} (rate-limited?)" >&2
+        (( FAILED++ )) || true; continue
     fi
 
-    EXISTING=$(crates_io "${API_TP}/${ENDPOINT}?crate=${CRATE}" | jq ".${ENDPOINT} | length")
+    sleep 1
+    RESPONSE=$(crates_io "${API_TP}/github_configs?crate=${CRATE}") || true
+    EXISTING=$(echo "$RESPONSE" | jq -r ".github_configs | length" 2>/dev/null) || EXISTING=""
+    if [[ -z "$EXISTING" ]]; then
+        echo "   FAILED — unexpected API response: ${RESPONSE}" >&2; (( FAILED++ )) || true; continue
+    fi
     if [[ "$EXISTING" -gt 0 ]]; then
-        echo "   skipped — already configured"; (( SKIPPED++ )); continue
+        echo "   skipped — already configured"; (( SKIPPED++ )) || true; continue
     fi
 
     PAYLOAD=$(jq --null-input --arg crate "$CRATE" --argjson base "$BASE" \
         '{github_config: ($base + {crate: $crate})}')
 
     if [[ "$DRY_RUN" == true ]]; then
-        echo "   [dry-run] would POST ${KIND}: ${PAYLOAD}"; (( SUCCESS++ )); continue
+        echo "   [dry-run] would register trusted publisher"; (( SUCCESS++ )) || true; continue
     fi
 
-    read -r -p "   Register ${KIND} trusted publisher for '${CRATE}'? [y/N] " REPLY
+    read -r -p "   Register trusted publisher for '${CRATE}'? [y/N] " REPLY
     if [[ ! "$REPLY" =~ ^[yY]$ ]]; then
-        echo "   skipped by user"; (( SKIPPED++ )); continue
+        echo "   skipped by user"; (( SKIPPED++ )) || true; continue
     fi
 
-    HTTP=$(crates_io --output /dev/null --write-out "%{http_code}" --request POST --data "$PAYLOAD" "${API_TP}/${ENDPOINT}")
+    sleep 1
+    BODY=$(crates_io --write-out "\n%{http_code}" --request POST --data "$PAYLOAD" "${API_TP}/github_configs") || true
+    HTTP=$(echo "$BODY" | tail -1)
+    BODY=$(echo "$BODY" | sed '$d')
     if [[ "$HTTP" =~ ^20[01]$ ]]; then
-        echo "   registered ${KIND} (HTTP ${HTTP})"; (( SUCCESS++ ))
+        echo "   registered (HTTP ${HTTP})"; (( SUCCESS++ )) || true
     else
-        echo "   FAILED (HTTP ${HTTP})" >&2; (( FAILED++ ))
+        echo "   FAILED (HTTP ${HTTP}): ${BODY}" >&2; (( FAILED++ )) || true
     fi
 done
 
 # ---------- summary ----------------------------------------------------------
 echo
-echo "Done — registered: ${SUCCESS}, skipped: ${SKIPPED}, failed: ${FAILED}"
+echo "Done — published: ${PUBLISHED}, registered: ${SUCCESS}, skipped: ${SKIPPED}, failed: ${FAILED}"
 [[ "$FAILED" -eq 0 ]]
