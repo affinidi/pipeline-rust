@@ -228,14 +228,19 @@ jobs:
 
           # Latest non-yanked version on crates.io via the sparse index.
           published_version() {
-            local n="$1" p
+            local n="$1" p body
             case "${#n}" in
               1) p="1/$n" ;;
               2) p="2/$n" ;;
               3) p="3/${n:0:1}/$n" ;;
               *) p="${n:0:2}/${n:2:2}/$n" ;;
             esac
-            curl -fsSL "https://index.crates.io/$p" 2>/dev/null \
+            # A never-published crate returns HTTP 404, which makes `curl -f`
+            # exit 22. Under `set -e -o pipefail` that would abort the whole
+            # step; instead treat "not found" as "no published version" so the
+            # crate is queued as new rather than crashing the release.
+            body="$(curl -fsSL "https://index.crates.io/$p" 2>/dev/null)" || return 0
+            printf '%s\n' "$body" \
               | jq -rs 'map(select(.yanked | not).vers) | sort_by(split(".") | map(tonumber? // 0)) | last // ""'
           }
           # True iff $1 is a strictly higher semver than $2.
