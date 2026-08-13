@@ -26,6 +26,11 @@ set -euo pipefail
 # issue is annotated only once.
 MARKER="<!-- affinidi-dependency-type-annotation -->"
 
+# `cargo audit` exits non-zero when it merely *finds* advisories (the normal case here,
+# since the actions-rust-lang/audit step has already reported them), so we must not let a
+# non-zero exit abort the script -- hence `|| true`. A genuine tool failure is still caught:
+# the next check rejects any output that isn't valid JSON and skips annotation rather than
+# proceeding on bad data.
 cargo audit --json > audit-report.json || true
 
 if ! jq -e . audit-report.json >/dev/null 2>&1; then
@@ -44,6 +49,21 @@ jq -c '
   ADVISORY_ID=$(echo "$entry" | jq -r '.advisory.id // empty')
   PKG_NAME=$(echo "$entry" | jq -r '.package.name')
   PKG_VER=$(echo "$entry" | jq -r '.package.version')
+
+  # Defense-in-depth: these values come from cargo-audit's output (the RustSec advisory DB
+  # plus this workspace's Cargo.lock). They are always used double-quoted below, so there is
+  # no shell/eval injection, but we still validate them against strict allowlists and skip
+  # anything malformed -- this also prevents a stray newline or `::` sequence from smuggling
+  # a GitHub Actions ::workflow-command:: into the annotation output.
+  if ! [[ "$PKG_NAME" =~ ^[A-Za-z0-9_-]+$ ]] || ! [[ "$PKG_VER" =~ ^[A-Za-z0-9._+-]+$ ]]; then
+    echo "Skipping finding with unexpected package name/version: ${PKG_NAME}@${PKG_VER}"
+    continue
+  fi
+  if [ -n "$ADVISORY_ID" ] && ! [[ "$ADVISORY_ID" =~ ^RUSTSEC-[0-9]{4}-[0-9]{4}$ ]]; then
+    echo "Skipping finding with unexpected advisory id: ${ADVISORY_ID}"
+    continue
+  fi
+
   TITLE_PREFIX="${ADVISORY_ID:-Crate $PKG_NAME $PKG_VER}"
 
   PARENTS=$(cargo tree -i "${PKG_NAME}@${PKG_VER}" --depth 1 -e normal,build,dev --prefix none 2>/dev/null \
@@ -69,9 +89,12 @@ jq -c '
   echo "::endgroup::"
 
   # TITLE_PREFIX and MARKER are passed to jq as --arg data, never spliced into the filter
-  # program text, so a crafted crate name or advisory id cannot inject jq syntax.
+  # program text, so a crafted crate name or advisory id cannot inject jq syntax. The match
+  # requires an exact title or the prefix followed by ":" (the action titles issues
+  # "<RUSTSEC-id>: <title>" or "Crate <name> <version>"), so a prefix can't loosely match an
+  # unrelated, longer issue title.
   ISSUE_NUM=$(gh issue list --search "${TITLE_PREFIX} in:title" --state open --json number,title \
-    | jq -r --arg prefix "$TITLE_PREFIX" '[.[] | select(.title | startswith($prefix))][0].number // empty')
+    | jq -r --arg prefix "$TITLE_PREFIX" '[.[] | select(.title == $prefix or (.title | startswith($prefix + ":")))][0].number // empty')
 
   if [ -n "$ISSUE_NUM" ]; then
     ALREADY=$(gh issue view "$ISSUE_NUM" --json comments \
