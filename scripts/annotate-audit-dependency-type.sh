@@ -69,6 +69,11 @@ jq -c '
   PARENTS=$(cargo tree -i "${PKG_NAME}@${PKG_VER}" --depth 1 -e normal,build,dev --prefix none 2>/dev/null \
     | tail -n +2 | awk '{print $1}' | sort -u)
 
+  # Parent names come from `cargo tree` and are embedded into the issue comment body below,
+  # so apply the same crate-name allowlist to them -- otherwise a crafted parent name could
+  # inject markdown/output into the posted comment. Anything not matching is dropped.
+  PARENTS=$(echo "$PARENTS" | grep -E '^[A-Za-z0-9_-]+$' || true)
+
   DIRECT="no"
   for p in $PARENTS; do
     if echo "$MEMBERS" | grep -qx "$p"; then
