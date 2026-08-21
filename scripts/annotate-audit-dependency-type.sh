@@ -66,8 +66,12 @@ jq -c '
 
   TITLE_PREFIX="${ADVISORY_ID:-Crate $PKG_NAME $PKG_VER}"
 
-  PARENTS=$(cargo tree -i "${PKG_NAME}@${PKG_VER}" --depth 1 -e normal,build,dev --prefix none 2>/dev/null \
-    | tail -n +2 | awk '{print $1}' | sort -u)
+  PARENTS=""
+  if TREE_OUTPUT=$(cargo tree -i "${PKG_NAME}@${PKG_VER}" --depth 1 -e normal,build,dev --prefix none 2>/dev/null); then
+    PARENTS=$(printf '%s\n' "$TREE_OUTPUT" | tail -n +2 | awk '{print $1}' | sort -u)
+  else
+    echo "cargo tree failed for ${PKG_NAME}@${PKG_VER}, using unknown parents."
+  fi
 
   # Parent names come from `cargo tree` and are embedded into the issue comment body below,
   # so apply the same crate-name allowlist to them -- otherwise a crafted parent name could
