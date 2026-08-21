@@ -28,6 +28,7 @@ jobs:
       # header of that file for the full rationale.
       - name: Annotate issues with direct/transitive dependency info
         if: always()
+        continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: scripts/annotate-audit-dependency-type.sh
