@@ -13,11 +13,22 @@ jobs:
       contents: read
       issues: write
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
-      - uses: actions-rust-lang/audit@v1
+      - uses: actions-rust-lang/audit@72c09e02f132669d52284a3323acdb503cfc1a24 # v1.2.7
         name: Audit Rust Dependencies
         with:
           ignore: ${{ inputs.auditIgnore }}
+
+      # Comment on each RustSec issue actions-rust-lang/audit just filed with whether the
+      # flagged crate is a direct or transitive dependency of this workspace. The logic lives
+      # in a standalone script so it can be tested independently of the workflow -- see the
+      # header of that file for the full rationale.
+      - name: Annotate issues with direct/transitive dependency info
+        if: always()
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: scripts/annotate-audit-dependency-type.sh
