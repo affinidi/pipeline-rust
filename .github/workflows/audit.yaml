@@ -17,6 +17,21 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
+
+      # Pre-install cargo-audit with --locked so it builds against cargo-audit's
+      # own vetted Cargo.lock. actions-rust-lang/audit otherwise runs
+      # `cargo install cargo-audit --vers 0.22.0` UNLOCKED, which re-resolves its
+      # transitive deps to the newest releases; one broken release then fails the
+      # audit on every repo that calls this workflow. It bit us on 2026-09-04:
+      # tinyvec 1.13.0 (`error: cannot find macro vec`) broke the cargo-audit
+      # build. With the exact version already installed, the action detects it and
+      # skips its own compile. Keep --vers and --no-default-features in lockstep
+      # with actions-rust-lang/audit's install line (its action.yml) so cargo
+      # treats them as the same install and skips.
+      - name: Pre-install cargo-audit (locked, resilient to broken transitive deps)
+        shell: bash
+        run: cargo +stable install cargo-audit --vers 0.22.0 --no-default-features --locked
+
       - uses: actions-rust-lang/audit@72c09e02f132669d52284a3323acdb503cfc1a24 # v1.2.7
         name: Audit Rust Dependencies
         with:
