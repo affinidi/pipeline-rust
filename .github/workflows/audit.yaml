@@ -54,12 +54,13 @@ jobs:
           key: cargo-audit-v0.22.0
           lookup-only: true
 
-      # `--vers 0.22.0` is a requirement, not an exact pin: it means ^0.22.0 and
-      # currently resolves to 0.22.2. That is fine -- but this line must stay
-      # BYTE-IDENTICAL to the action's install line (`=0.22.0` included, if it
-      # ever gains one). If the two resolve to different versions, cargo will not
-      # treat them as the same install and the unlocked compile comes back
-      # silently. The guard step below fails the job if they ever drift.
+      # `--vers 0.22.0` installs exactly 0.22.0: cargo install treats a bare
+      # MAJOR.MINOR.PATCH as an exact version, explicitly not as a caret
+      # requirement the way a Cargo.toml dependency would be. Keep this line
+      # byte-identical to the action's install line regardless -- cargo only
+      # counts the two as the same install when version, feature flags and
+      # profile all match, and any drift silently brings the unlocked compile
+      # back. The guard step below fails the job if they ever diverge.
       - name: Pre-install cargo-audit (locked, resilient to broken transitive deps)
         if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
         run: cargo +stable install cargo-audit --vers 0.22.0 --no-default-features --locked
