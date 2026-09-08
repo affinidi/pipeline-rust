@@ -17,6 +17,73 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
+
+      # actions-rust-lang/audit installs cargo-audit UNLOCKED:
+      # `cargo install cargo-audit --vers 0.22.0 --no-default-features` (see its
+      # action.yml). That re-resolves cargo-audit's own transitive deps to the
+      # newest releases, so a single broken release fails the audit job on every
+      # repo that calls this workflow, with no security advisory involved. It bit
+      # us on 2026-09-04: tinyvec 1.13.0 (`error: cannot find macro vec`) broke
+      # the cargo-audit build.
+      #
+      # So we pre-install cargo-audit ourselves with --locked, which builds
+      # against cargo-audit's own vetted Cargo.lock. Cargo does not record
+      # --locked in .crates2.json and does not compare the rustc version, so with
+      # the same version and feature flags already installed the action's own
+      # install step reports "already installed" and skips its unlocked compile.
+      #
+      # The action only installs on a cache miss, so we look up the same cache it
+      # uses (same key, same paths) and skip the pre-install on a hit -- otherwise
+      # every audit run in every downstream repo would compile cargo-audit from
+      # source on every run, which is exactly what that cache exists to avoid.
+      # lookup-only, so this is an existence check and nothing is downloaded twice:
+      # the action's own cache step still owns both the restore and the save.
+      - name: Identify cargo installation directory
+        id: cargo-home
+        run: echo "cargohome=${CARGO_HOME:-$HOME/.cargo}" >> $GITHUB_OUTPUT
+
+      - name: Look up the cargo-audit binary cache the audit action uses
+        uses: actions/cache/restore@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        id: cargo-audit-cache
+        with:
+          path: |
+            ${{ steps.cargo-home.outputs.cargohome }}/bin/cargo-audit*
+            ${{ steps.cargo-home.outputs.cargohome }}/.crates.toml
+            ${{ steps.cargo-home.outputs.cargohome }}/.crates2.json
+          # Must match actions-rust-lang/audit's cache key exactly.
+          key: cargo-audit-v0.22.0
+          lookup-only: true
+
+      # `--vers 0.22.0` is a requirement, not an exact pin: it means ^0.22.0 and
+      # currently resolves to 0.22.2. That is fine -- but this line must stay
+      # BYTE-IDENTICAL to the action's install line (`=0.22.0` included, if it
+      # ever gains one). If the two resolve to different versions, cargo will not
+      # treat them as the same install and the unlocked compile comes back
+      # silently. The guard step below fails the job if they ever drift.
+      - name: Pre-install cargo-audit (locked, resilient to broken transitive deps)
+        if: steps.cargo-audit-cache.outputs.cache-hit != 'true'
+        run: cargo +stable install cargo-audit --vers 0.22.0 --no-default-features --locked
+
+      - name: Assert the audit action still installs the cargo-audit we pre-install
+        env:
+          # Keep in step with the `uses:` pin below.
+          AUDIT_ACTION_SHA: 72c09e02f132669d52284a3323acdb503cfc1a24
+          EXPECTED_INSTALL: cargo +stable install cargo-audit --vers 0.22.0 --no-default-features
+        run: |
+          set -euo pipefail
+          url="https://raw.githubusercontent.com/actions-rust-lang/audit/${AUDIT_ACTION_SHA}/action.yml"
+          if ! action_yml=$(curl -fsSL --retry 3 --retry-delay 2 "$url"); then
+            echo "::warning::Could not fetch $url; skipping the install-line drift check."
+            exit 0
+          fi
+          actual=$(printf '%s\n' "$action_yml" | sed -n 's/^ *run: *\(cargo .*install cargo-audit .*\)$/\1/p')
+          if [ "$actual" != "$EXPECTED_INSTALL" ]; then
+            echo "::error::actions-rust-lang/audit@${AUDIT_ACTION_SHA} installs: ${actual:-<no install line found>}"
+            echo "::error::but the pre-install step above expects:              $EXPECTED_INSTALL"
+            echo "::error::Update the pre-install step, the cache key and EXPECTED_INSTALL to match, then re-pin."
+            exit 1
+          fi
+
       - uses: actions-rust-lang/audit@72c09e02f132669d52284a3323acdb503cfc1a24 # v1.2.7
         name: Audit Rust Dependencies
         with:
