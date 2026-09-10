@@ -33,9 +33,64 @@ jobs:
           ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       - name: Verify all crates can be packaged
         run: |
+          # Crates whose CURRENT version is not on the registry are packaged
+          # together; everything else is packaged one at a time, as before.
+          #
+          # Why the split. Packaging a crate on its own makes cargo resolve its
+          # path dependencies from crates.io, because the packaged form carries
+          # no paths. In a workspace whose crates depend on each other that asks
+          # the wrong question of any PR bumping two of them together: each is
+          # checked against a world where its siblings were never published. That
+          # world never occurs — the release job publishes in dependency order —
+          # and the symptom is
+          #   failed to select a version for the requirement `sibling = "^0.24"`
+          #   candidate versions found which didn't match: 0.23.0, ...
+          # naming the very versions the PR is creating. The gate could not pass
+          # on exactly the change it most needed to check, so the habit became to
+          # merge past it, which costs the gate for every other change too.
+          #
+          # Handed to cargo together, those crates resolve each other from the
+          # workspace and still get every real check: manifest completeness, a
+          # version on every dependency, the included file list, and a verify
+          # build of the packaged form.
+          #
+          # Why only the unpublished ones, rather than the whole workspace at
+          # once. A crate whose version IS already on crates.io fails a combined
+          # run with `checksum for <dep> changed between lock files`, because its
+          # verify build sees a locally built copy of a version the registry also
+          # has. Crates in the grouped set are by construction the ones with no
+          # registry copy to disagree with.
+          #
+          # The sparse index is a CDN and is not rate limited, unlike the API.
+          idx_path() {
+            n=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+            case ${#n} in
+              1) printf '1/%s' "$n" ;;
+              2) printf '2/%s' "$n" ;;
+              3) printf '3/%s/%s' "$(printf '%s' "$n" | cut -c1)" "$n" ;;
+              *) printf '%s/%s/%s' "$(printf '%s' "$n" | cut -c1-2)" "$(printf '%s' "$n" | cut -c3-4)" "$n" ;;
+            esac
+          }
+
           echo "Verifying all workspace crates can be packaged..."
+          pkgs=$(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.publish == null) | "\(.name) \(.version)"')
+          solo=""
+          grouped=""
+          while read -r name ver; do
+            [ -z "$name" ] && continue
+            body=$(curl -s --max-time 20 "https://index.crates.io/$(idx_path "$name")" || true)
+            if printf '%s' "$body" | jq -r '.vers' 2>/dev/null | grep -qx "$ver"; then
+              solo="$solo $name"
+            else
+              echo "  $name $ver is not on the registry yet - will be checked with its siblings"
+              grouped="$grouped -p $name"
+            fi
+          done <<CRATES
+          $pkgs
+          CRATES
+
           failed=""
-          for crate in $(cargo metadata --format-version=1 --no-deps | jq -r '.packages[] | select(.publish == null) | .name'); do
+          for crate in $solo; do
             echo -n "Checking $crate... "
             # Suppress deprecation warnings during package check
             if output=$(RUSTFLAGS="${{ inputs.rustflags }} -A deprecated" cargo package -p "$crate" --allow-dirty 2>&1); then
@@ -46,6 +101,15 @@ jobs:
               failed="$failed $crate"
             fi
           done
+
+          if [ -n "$grouped" ]; then
+            echo ""
+            echo "Checking unpublished crates together:$(printf '%s' "$grouped" | sed 's/ -p / /g')"
+            if ! RUSTFLAGS="${{ inputs.rustflags }} -A deprecated" cargo package $grouped --allow-dirty; then
+              failed="$failed$(printf '%s' "$grouped" | sed 's/ -p / /g')"
+            fi
+          fi
+
           if [ -n "$failed" ]; then
             echo ""
             echo "Failed crates:$failed"
