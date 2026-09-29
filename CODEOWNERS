@@ -1,1 +1,9 @@
-* @marat-affinidi @robert-affinidi @victor-affinidi @yaroslav-affinidi @raghavendrram
+# Platform owns the Rust pipeline.
+*                                   @marat-affinidi @robert-affinidi @victor-affinidi @yaroslav-affinidi @raghavendrram
+
+# Security owns the security gates. These files decide what the pipeline
+# actually catches, so a change to them needs an approval from security.
+/deny.toml                          @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
+/.github/workflows/audit.yaml       @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
+/.github/workflows/cargo-deny.yaml  @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
+/SECURITY.md                        @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
