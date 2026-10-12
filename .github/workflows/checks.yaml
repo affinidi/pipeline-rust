@@ -41,6 +41,23 @@ on:
         required: false
         type: boolean
         default: false
+      # Passed to test.yaml; see the descriptions there.
+      free-disk-space:
+        required: false
+        type: boolean
+        default: false
+      lean-debuginfo:
+        required: false
+        type: boolean
+        default: false
+      build-jobs:
+        required: false
+        type: string
+        default: ""
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-24.04
 
 jobs:
   audit:
@@ -59,6 +76,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   test:
     uses: affinidi/pipeline-rust/.github/workflows/test.yaml@main
@@ -67,6 +85,10 @@ jobs:
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       useRedis: ${{ inputs.useRedis }}
+      free-disk-space: ${{ inputs.free-disk-space }}
+      lean-debuginfo: ${{ inputs.lean-debuginfo }}
+      build-jobs: ${{ inputs.build-jobs }}
+      runs-on: ${{ inputs.runs-on }}
 
   fmt:
     uses: affinidi/pipeline-rust/.github/workflows/fmt.yaml@main
@@ -81,6 +103,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   rust-scan:
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
@@ -96,6 +119,7 @@ jobs:
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
       coverage: ${{ inputs.coverage }}
       useRedis: ${{ inputs.useRedis }}
+      runs-on: ${{ inputs.runs-on }}
 
   verify-publish:
     if: ${{ inputs.verifyPublish }}
@@ -104,6 +128,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   deprecation-check:
     if: ${{ inputs.deprecationCheck }}
@@ -112,3 +137,4 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
