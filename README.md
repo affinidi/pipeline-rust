@@ -64,6 +64,21 @@ jobs:
 Larger runners are billed even for public repositories, and the runner's group
 must allow the calling repository.
 
+`release.yaml` takes the same `runs-on` input for its publish job, plus
+`build-jobs` (default `0`, cargo's default of one job per CPU). Lower it when
+verifying a large crate exhausts the runner's memory and the job is killed
+mid-publish:
+
+```yaml
+jobs:
+  rust-pipeline:
+    uses: affinidi/pipeline-rust/.github/workflows/release.yaml@main
+    secrets: inherit
+    with:
+      runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-24.04' }}
+      build-jobs: 2
+```
+
 ## Publishing new crate
 
 The release pipeline uses [crates.io Trusted Publishing](https://crates.io/docs/trusted-publishing) — no `CARGO_REGISTRY_TOKEN` secret needed once configured.
