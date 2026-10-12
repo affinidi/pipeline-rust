@@ -13,11 +13,15 @@ on:
         required: false
         type: string
         default: libdbus-1-dev libssl-dev
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-24.04
 
 jobs:
   check:
     name: Cargo Check
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runs-on }}
     steps:
       - uses: actions/checkout@v4
         with:

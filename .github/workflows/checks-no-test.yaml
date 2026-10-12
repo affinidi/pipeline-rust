@@ -33,6 +33,10 @@ on:
         required: false
         type: boolean
         default: false
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-24.04
 
 jobs:
   audit:
@@ -51,6 +55,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   fmt:
     uses: affinidi/pipeline-rust/.github/workflows/fmt.yaml@main
@@ -65,6 +70,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   rust-scan:
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
@@ -79,6 +85,7 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}
 
   deprecation-check:
     if: ${{ inputs.deprecationCheck }}
@@ -87,3 +94,4 @@ jobs:
       toolchain: ${{ inputs.toolchain }}
       rustflags: ${{ inputs.rustflags }}
       ubuntu-rust-deps: ${{ inputs.ubuntu-rust-deps }}
+      runs-on: ${{ inputs.runs-on }}

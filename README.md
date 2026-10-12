@@ -41,6 +41,29 @@ jobs:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
 ```
 
+## Choosing the runner
+
+`checks.yaml`, `checks-no-test.yaml` and `checks-test-only.yaml` take an
+optional `runs-on` input (default `ubuntu-24.04`). It applies to the jobs that
+compile the workspace: cargo check, clippy, test, coverage, verify-publish and
+deprecation-check. fmt, audit and cargo-deny always run on the default runner.
+
+Use it to move those jobs to a larger GitHub-hosted runner. Falling back to the
+default when a repository variable is unset keeps the caller working before the
+runner exists:
+
+```yaml
+jobs:
+  rust-pipeline:
+    uses: affinidi/pipeline-rust/.github/workflows/checks.yaml@main
+    secrets: inherit
+    with:
+      runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-24.04' }}
+```
+
+Larger runners are billed even for public repositories, and the runner's group
+must allow the calling repository.
+
 ## Publishing new crate
 
 The release pipeline uses [crates.io Trusted Publishing](https://crates.io/docs/trusted-publishing) — no `CARGO_REGISTRY_TOKEN` secret needed once configured.
