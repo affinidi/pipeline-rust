@@ -80,13 +80,26 @@ jobs:
       APT_DEPS: ${{ inputs.apt-deps }}
       MAX_GLIBC: ${{ inputs.max-glibc }}
     steps:
-      - name: Check the max-glibc input
+      # The apt inputs are split on spaces and passed to apt-get, so every word
+      # must be a Debian package name. This stops a word like `-o` being read
+      # as an apt-get option. The smoke-test job needs this job, so checking
+      # its packages here covers it too.
+      - name: Check the inputs
+        env:
+          SMOKE_TEST_APT_DEPS: ${{ inputs.smoke-test-apt-deps }}
         run: |
           set -euo pipefail
           if [ -n "${MAX_GLIBC}" ] && ! [[ "${MAX_GLIBC}" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
             echo "::error::max-glibc must be a version like 2.34, got ${MAX_GLIBC}"
             exit 1
           fi
+          set -f
+          for dep in ${APT_DEPS} ${SMOKE_TEST_APT_DEPS}; do
+            if ! [[ "${dep}" =~ ^[a-z0-9][a-z0-9+.-]+$ ]]; then
+              echo "::error::apt-deps and smoke-test-apt-deps take Debian package names only, got ${dep}"
+              exit 1
+            fi
+          done
 
       - name: Install build dependencies
         run: |
