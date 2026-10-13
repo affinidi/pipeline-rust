@@ -1,0 +1,369 @@
+# Builds Linux binaries for a pushed version tag, smoke tests them on Debian
+# bookworm-slim and publishes them to the tag's GitHub Release as
+# `<binary>-<version>-<target>.tar.gz` archives plus one `SHA256SUMS` file.
+#
+# The tag must be `v<version>` where `<version>` is the version of the package
+# that owns the binary, so `v1.4.0` publishes `fabric-1.4.0-<target>.tar.gz`.
+#
+# Builds run inside a Debian bookworm container, so the binaries need at most
+# glibc 2.36 and run on bookworm and newer distributions. The build log shows
+# the exact glibc version each binary needs, and `max-glibc` fails the build
+# when it needs a newer one. aarch64 is cross compiled on the x86_64 runner
+# with Debian's gcc-aarch64-linux-gnu, and the libraries in `apt-deps` are
+# installed for the target architecture through Debian multiarch.
+on:
+  workflow_call:
+    inputs:
+      binary:
+        description: "Name of the [[bin]] target to ship. Also the archive name prefix."
+        required: true
+        type: string
+      package:
+        description: "Package that owns the binary. Needed only when more than one workspace package has a bin of that name. Empty finds the owning package from cargo metadata."
+        required: false
+        type: string
+        default: ""
+      toolchain:
+        required: false
+        type: string
+        default: stable
+      targets:
+        description: "JSON list of Rust targets. Supported: x86_64-unknown-linux-gnu, aarch64-unknown-linux-gnu."
+        required: false
+        type: string
+        default: '["x86_64-unknown-linux-gnu", "aarch64-unknown-linux-gnu"]'
+      apt-deps:
+        description: "Debian -dev packages the build links against, installed for each target's architecture. Empty installs none."
+        required: false
+        type: string
+        default: ""
+      smoke-test-apt-deps:
+        description: "Debian packages the binary needs at run time, installed before the smoke test. Empty tests on a bare image."
+        required: false
+        type: string
+        default: ""
+      smoke-test:
+        description: "Extra shell commands run after `<binary> --version` and `<binary> --help`, with the binary on PATH."
+        required: false
+        type: string
+        default: ""
+      max-glibc:
+        description: "Highest glibc version the binary may need, for example 2.34. The build fails if it needs a newer one. Empty skips the check."
+        required: false
+        type: string
+        default: ""
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ubuntu-24.04
+    # Building on bookworm caps the glibc the binaries need at 2.36. Building on
+    # the ubuntu-24.04 runner directly would need 2.39, which bookworm lacks.
+    # Bump the digest with `docker buildx imagetools inspect debian:bookworm`.
+    container:
+      image: debian:bookworm@sha256:2c037a04925515fdd6ea85ea14a682d0e79931f5e9f5d07b6dbfc6ba12f9e858
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        target: ${{ fromJSON(inputs.targets) }}
+    env:
+      DEBIAN_FRONTEND: noninteractive
+      TARGET: ${{ matrix.target }}
+      BINARY: ${{ inputs.binary }}
+      PACKAGE: ${{ inputs.package }}
+      APT_DEPS: ${{ inputs.apt-deps }}
+      MAX_GLIBC: ${{ inputs.max-glibc }}
+    steps:
+      # The apt inputs are split on spaces and passed to apt-get, so every word
+      # must be a Debian package name. This stops a word like `-o` being read
+      # as an apt-get option. The smoke-test job needs this job, so checking
+      # its packages here covers it too.
+      - name: Check the inputs
+        env:
+          SMOKE_TEST_APT_DEPS: ${{ inputs.smoke-test-apt-deps }}
+        run: |
+          set -euo pipefail
+          if [ -n "${MAX_GLIBC}" ] && ! [[ "${MAX_GLIBC}" =~ ^[0-9]+(\.[0-9]+)*$ ]]; then
+            echo "::error::max-glibc must be a version like 2.34, got ${MAX_GLIBC}"
+            exit 1
+          fi
+          set -f
+          for dep in ${APT_DEPS} ${SMOKE_TEST_APT_DEPS}; do
+            if ! [[ "${dep}" =~ ^[a-z0-9][a-z0-9+.-]+$ ]]; then
+              echo "::error::apt-deps and smoke-test-apt-deps take Debian package names only, got ${dep}"
+              exit 1
+            fi
+          done
+
+      - name: Install build dependencies
+        run: |
+          set -euo pipefail
+          case "${TARGET}" in
+            x86_64-unknown-linux-gnu)
+              deb_arch=amd64
+              cross_pkgs=""
+              ;;
+            aarch64-unknown-linux-gnu)
+              deb_arch=arm64
+              cross_pkgs="gcc-aarch64-linux-gnu g++-aarch64-linux-gnu libc6-dev-arm64-cross"
+              dpkg --add-architecture arm64
+              {
+                echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc"
+                echo "CC_aarch64_unknown_linux_gnu=aarch64-linux-gnu-gcc"
+                echo "CXX_aarch64_unknown_linux_gnu=aarch64-linux-gnu-g++"
+                echo "AR_aarch64_unknown_linux_gnu=aarch64-linux-gnu-ar"
+                echo "PKG_CONFIG_ALLOW_CROSS=1"
+                echo "PKG_CONFIG_LIBDIR_aarch64_unknown_linux_gnu=/usr/lib/aarch64-linux-gnu/pkgconfig:/usr/share/pkgconfig"
+              } >> "${GITHUB_ENV}"
+              ;;
+            *)
+              echo "::error::Unsupported target ${TARGET}"
+              exit 1
+              ;;
+          esac
+          target_deps=()
+          for dep in ${APT_DEPS}; do
+            target_deps+=("${dep}:${deb_arch}")
+          done
+          apt-get update
+          apt-get install -y --no-install-recommends \
+            build-essential ca-certificates curl git jq pkg-config \
+            ${cross_pkgs} "${target_deps[@]}"
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # No cache: a release build starts clean so nothing restored from an
+      # earlier run ends up in the shipped binary.
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+        with:
+          toolchain: ${{ inputs.toolchain }}
+          target: ${{ matrix.target }}
+          rustflags: ""
+          cache: false
+
+      - name: Check the tag matches the package version
+        id: version
+        run: |
+          set -euo pipefail
+          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
+            echo "::error::Release binaries are built from a version tag, got ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}"
+            exit 1
+          fi
+          matches="$(cargo metadata --no-deps --format-version 1 --locked \
+            | jq -r --arg bin "${BINARY}" --arg pkg "${PACKAGE}" \
+              '.packages[]
+               | select($pkg == "" or .name == $pkg)
+               | select(any(.targets[]; .name == $bin and (.kind | index("bin"))))
+               | "\(.name) \(.version)"')"
+          if [ -z "${matches}" ]; then
+            if [ -n "${PACKAGE}" ]; then
+              echo "::error::Package ${PACKAGE} has no binary named ${BINARY}"
+            else
+              echo "::error::No workspace package has a binary named ${BINARY}"
+            fi
+            exit 1
+          fi
+          if [ "$(printf '%s\n' "${matches}" | grep -c .)" -ne 1 ]; then
+            echo "::error::More than one package has a binary named ${BINARY}: ${matches//$'\n'/, }. Set the package input to pick one."
+            exit 1
+          fi
+          read -r owner version <<< "${matches}"
+          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
+            echo "::error::Tag ${GITHUB_REF_NAME} does not match ${owner} version ${version}, expected v${version}"
+            exit 1
+          fi
+          {
+            echo "package=${owner}"
+            echo "version=${version}"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build
+        env:
+          OWNER_PACKAGE: ${{ steps.version.outputs.package }}
+        run: |
+          set -euo pipefail
+          cargo build --release --locked --target "${TARGET}" --package "${OWNER_PACKAGE}" --bin "${BINARY}"
+
+      - name: Check the glibc version the binary needs
+        run: |
+          set -euo pipefail
+          objdump=objdump
+          if [ "${TARGET}" = "aarch64-unknown-linux-gnu" ]; then
+            objdump=aarch64-linux-gnu-objdump
+          fi
+          # objdump exits 1 with "not a dynamic object" for a static binary,
+          # which needs no glibc at run time.
+          if ! symbols="$("${objdump}" -T "target/${TARGET}/release/${BINARY}" 2>&1)"; then
+            if ! grep -q 'not a dynamic object' <<< "${symbols}"; then
+              printf '%s\n' "${symbols}"
+              echo "::error::${objdump} could not read the symbols of ${BINARY} for ${TARGET}"
+              exit 1
+            fi
+            symbols=""
+          fi
+          needed="$(grep -o 'GLIBC_[0-9.]*' <<< "${symbols}" | sort -uV | tail -n 1 || true)"
+          if [ -z "${needed}" ]; then
+            echo "${BINARY} for ${TARGET} needs no glibc symbols"
+            exit 0
+          fi
+          needed="${needed#GLIBC_}"
+          echo "${BINARY} for ${TARGET} needs glibc ${needed}"
+          if [ -z "${MAX_GLIBC}" ]; then
+            exit 0
+          fi
+          lowest="$(printf '%s\n%s\n' "${needed}" "${MAX_GLIBC}" | sort -V | head -n 1)"
+          if [ "${lowest}" != "${needed}" ]; then
+            echo "::error::${BINARY} for ${TARGET} needs glibc ${needed}, newer than max-glibc ${MAX_GLIBC}"
+            exit 1
+          fi
+
+      - name: Package
+        id: package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          stage="${BINARY}-${VERSION}-${TARGET}"
+          mkdir -p "dist/${stage}"
+          cp "target/${TARGET}/release/${BINARY}" "dist/${stage}/"
+          # Apache-2.0 and similar licenses require these to travel with the binary.
+          for doc in LICENSE NOTICE.txt NOTICE README.md; do
+            if [ -f "${doc}" ]; then
+              cp "${doc}" "dist/${stage}/"
+            fi
+          done
+          tar -C dist --owner=0 --group=0 --numeric-owner -czf "dist/${stage}.tar.gz" "${stage}"
+          echo "archive=dist/${stage}.tar.gz" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: ${{ inputs.binary }}-${{ matrix.target }}
+          path: ${{ steps.package.outputs.archive }}
+          if-no-files-found: error
+          retention-days: 7
+
+  smoke-test:
+    name: Smoke test ${{ matrix.target }}
+    needs: [build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        target: ${{ fromJSON(inputs.targets) }}
+    env:
+      TARGET: ${{ matrix.target }}
+      # Bump the digest with `docker buildx imagetools inspect debian:bookworm-slim`.
+      SMOKE_TEST_IMAGE: debian:bookworm-slim@sha256:7c7b2c966bc9ee8cedfeef67e0e279108992c77681fa595db4a9d65c06ccc587
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: ${{ inputs.binary }}-${{ matrix.target }}
+          path: dist
+
+      - name: Pick the container platform
+        id: platform
+        run: |
+          set -euo pipefail
+          case "${TARGET}" in
+            x86_64-*) echo "platform=linux/amd64" >> "${GITHUB_OUTPUT}" ;;
+            aarch64-*) echo "platform=linux/arm64" >> "${GITHUB_OUTPUT}" ;;
+            *) echo "::error::Unsupported target ${TARGET}"; exit 1 ;;
+          esac
+
+      # Runs the aarch64 binary on the x86_64 runner through QEMU.
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1 # v4.4.0
+        if: ${{ steps.platform.outputs.platform == 'linux/arm64' }}
+        with:
+          image: tonistiigi/binfmt:qemu-v10.2.3@sha256:400a4873b838d1b89194d982c45e5fb3cda4593fbfd7e08a02e76b03b21166f0
+          platforms: arm64
+          cache-image: false
+
+      - name: Run the binary on Debian bookworm
+        env:
+          PLATFORM: ${{ steps.platform.outputs.platform }}
+          BINARY: ${{ inputs.binary }}
+          RUNTIME_APT_DEPS: ${{ inputs.smoke-test-apt-deps }}
+          SMOKE_TEST: ${{ inputs.smoke-test }}
+        run: |
+          set -euo pipefail
+          docker run --rm --platform "${PLATFORM}" \
+            -v "${PWD}/dist:/dist:ro" \
+            -e BINARY -e RUNTIME_APT_DEPS -e SMOKE_TEST \
+            "${SMOKE_TEST_IMAGE}" \
+            bash -euo pipefail -c '
+              if [ -n "${RUNTIME_APT_DEPS}" ]; then
+                apt-get update -qq
+                DEBIAN_FRONTEND=noninteractive apt-get install -y -qq --no-install-recommends ${RUNTIME_APT_DEPS}
+              fi
+              mkdir /tmp/unpack
+              tar -C /tmp/unpack -xzf /dist/*.tar.gz
+              install -m 0755 /tmp/unpack/*/"${BINARY}" /usr/local/bin/
+              "${BINARY}" --version
+              "${BINARY}" --help
+              if [ -n "${SMOKE_TEST}" ]; then
+                bash -euo pipefail -c "${SMOKE_TEST}"
+              fi
+            '
+
+  release:
+    name: Publish GitHub Release
+    needs: [smoke-test]
+    runs-on: ubuntu-24.04
+    # The only job that can write to the repository.
+    permissions:
+      contents: write
+    concurrency:
+      group: release-binaries-${{ github.ref }}
+      cancel-in-progress: false
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: ${{ inputs.binary }}-*
+          path: dist
+          merge-multiple: true
+
+      - name: Write SHA256SUMS
+        working-directory: dist
+        run: |
+          set -euo pipefail
+          sha256sum -- *.tar.gz > SHA256SUMS
+          cat SHA256SUMS
+
+      # Build provenance (actions/attest-build-provenance, with id-token: write
+      # and attestations: write) goes here once the calling repository is public.
+
+      # The release is created as a draft with every file attached and published
+      # last, so nobody sees a release with missing archives. A rerun replaces a
+      # leftover draft but never touches a published release.
+      - name: Publish release
+        working-directory: dist
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          set -euo pipefail
+          if is_draft="$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null)"; then
+            if [ "${is_draft}" != "true" ]; then
+              echo "::error::Release ${TAG} is already published. Delete it or push a new tag."
+              exit 1
+            fi
+            gh release delete "${TAG}" --yes
+          fi
+          prerelease_args=()
+          if [[ "${TAG}" == *-* ]]; then
+            prerelease_args=(--prerelease)
+          fi
+          gh release create "${TAG}" --draft --verify-tag --title "${TAG}" --generate-notes \
+            "${prerelease_args[@]}" -- *.tar.gz SHA256SUMS
+          gh release edit "${TAG}" --draft=false
