@@ -146,26 +146,12 @@ jobs:
           persist-credentials: false
 
       # The scripts come from pipeline-rust at the commit the caller pinned this
-      # workflow to, not from the caller's checkout. An empty workflow_sha would
-      # make checkout fall back to the default branch, so it fails instead. This
-      # runs after the caller checkout, which would otherwise clean it away.
-      - name: Check the pipeline-rust commit is known
-        env:
-          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
-          WORKFLOW_SHA: ${{ job.workflow_sha }}
-        run: |
-          set -euo pipefail
-          if [ -z "${WORKFLOW_REPOSITORY}" ] || [ -z "${WORKFLOW_SHA}" ]; then
-            echo "::error::job.workflow_repository or job.workflow_sha is empty, so the pipeline-rust scripts cannot be fetched at the pinned commit"
-            exit 1
-          fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # workflow to, not from the caller's checkout. This runs after the caller
+      # checkout, which would otherwise clean them away.
+      - uses: affinidi/pipeline-rust/.github/actions/checkout-pipeline-scripts@main # see the action for why @main
         with:
           repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .pipeline-rust
-          persist-credentials: false
+          sha: ${{ job.workflow_sha }}
 
       # Hide the scripts from the caller's git status, so a build script that
       # stamps the binary with a dirty-tree flag sees the same tree as before.
@@ -301,23 +287,10 @@ jobs:
       cancel-in-progress: false
     steps:
       # See the build job for why the scripts are fetched this way.
-      - name: Check the pipeline-rust commit is known
-        env:
-          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
-          WORKFLOW_SHA: ${{ job.workflow_sha }}
-        run: |
-          set -euo pipefail
-          if [ -z "${WORKFLOW_REPOSITORY}" ] || [ -z "${WORKFLOW_SHA}" ]; then
-            echo "::error::job.workflow_repository or job.workflow_sha is empty, so the pipeline-rust scripts cannot be fetched at the pinned commit"
-            exit 1
-          fi
-
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: affinidi/pipeline-rust/.github/actions/checkout-pipeline-scripts@main # see the action for why @main
         with:
           repository: ${{ job.workflow_repository }}
-          ref: ${{ job.workflow_sha }}
-          path: .pipeline-rust
-          persist-credentials: false
+          sha: ${{ job.workflow_sha }}
 
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
