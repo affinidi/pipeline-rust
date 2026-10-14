@@ -31,6 +31,13 @@ jobs:
           sha: ${{ job.workflow_sha }}
           if-missing: skip
 
+      # continue-on-error keeps a failed fetch from failing the audit, but also
+      # keeps the job green, which is how annotation silently never ran before.
+      # Surface it in the run summary. A skip already warns from the action.
+      - name: Warn that issue annotation will not run
+        if: steps.pipeline-scripts.outcome == 'failure'
+        run: echo "::warning::The pipeline-rust scripts could not be fetched, so RustSec issues will not be annotated. See the checkout-pipeline-scripts step for the cause."
+
       # actions-rust-lang/audit installs cargo-audit UNLOCKED:
       # `cargo install cargo-audit --vers 0.22.0 --no-default-features` (see its
       # action.yml). That re-resolves cargo-audit's own transitive deps to the
