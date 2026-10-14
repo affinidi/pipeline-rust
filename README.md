@@ -87,6 +87,7 @@ jobs:
 | `smoke-test-apt-deps` | empty | Debian packages the binary needs at run time, installed in the smoke test image. Binaries that make HTTPS calls with the system's root certificates usually need `ca-certificates`. |
 | `smoke-test` | empty | Extra shell commands run after `<binary> --version` and `<binary> --help`, with the binary on `PATH`. |
 | `max-glibc` | empty | Highest glibc version the binary may need, for example `2.34`. The build fails if it needs a newer one. Empty skips the check. |
+| `runs-on` | `ubuntu-24.04` | Runner for the build jobs. Must be an x86_64 Linux runner with Docker. See [Choosing the runner](#choosing-the-runner). |
 
 The smoke test runs on a bare `debian:bookworm-slim` image with only the
 `smoke-test-apt-deps` packages added. `--version` and `--help` make no network
@@ -141,6 +142,11 @@ jobs:
       runs-on: ${{ vars.CI_RUNNER_LARGE || 'ubuntu-24.04' }}
       build-jobs: 2
 ```
+
+`release-binaries.yaml` takes `runs-on` for its build jobs only; the smoke test
+and release jobs stay on `ubuntu-24.04`. It must be an x86_64 Linux runner
+with Docker, because the build runs in a Debian bookworm container that builds
+x86_64 natively and cross compiles aarch64.
 
 ## Publishing new crate
 

@@ -52,6 +52,11 @@ on:
         required: false
         type: string
         default: ""
+      runs-on:
+        description: "Runner for the build jobs. Must be an x86_64 Linux runner with Docker: the build runs in a Debian container that builds x86_64 natively and cross compiles aarch64."
+        required: false
+        type: string
+        default: ubuntu-24.04
 
 defaults:
   run:
@@ -60,7 +65,7 @@ defaults:
 jobs:
   build:
     name: Build ${{ matrix.target }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.runs-on }}
     # Building on bookworm caps the glibc the binaries need at 2.36. Building on
     # the ubuntu-24.04 runner directly would need 2.39, which bookworm lacks.
     # Bump the digest with `docker buildx imagetools inspect debian:bookworm`.
@@ -140,6 +145,37 @@ jobs:
         with:
           persist-credentials: false
 
+      # The scripts come from pipeline-rust at the commit the caller pinned this
+      # workflow to, not from the caller's checkout. An empty workflow_sha would
+      # make checkout fall back to the default branch, so it fails instead. This
+      # runs after the caller checkout, which would otherwise clean it away.
+      - name: Check the pipeline-rust commit is known
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WORKFLOW_REPOSITORY}" ] || [ -z "${WORKFLOW_SHA}" ]; then
+            echo "::error::job.workflow_repository or job.workflow_sha is empty, so the pipeline-rust scripts cannot be fetched at the pinned commit"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pipeline-rust
+          persist-credentials: false
+
+      # Hide the scripts from the caller's git status, so a build script that
+      # stamps the binary with a dirty-tree flag sees the same tree as before.
+      # Written directly rather than through git, which can refuse the
+      # container's workspace as having dubious ownership.
+      - name: Exclude the scripts from the caller's git status
+        run: |
+          set -euo pipefail
+          echo '/.pipeline-rust/' >> .git/info/exclude
+
       # No cache: a release build starts clean so nothing restored from an
       # earlier run ends up in the shipped binary.
       - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
@@ -151,39 +187,7 @@ jobs:
 
       - name: Check the tag matches the package version
         id: version
-        run: |
-          set -euo pipefail
-          if [ "${GITHUB_REF_TYPE}" != "tag" ]; then
-            echo "::error::Release binaries are built from a version tag, got ${GITHUB_REF_TYPE} ${GITHUB_REF_NAME}"
-            exit 1
-          fi
-          matches="$(cargo metadata --no-deps --format-version 1 --locked \
-            | jq -r --arg bin "${BINARY}" --arg pkg "${PACKAGE}" \
-              '.packages[]
-               | select($pkg == "" or .name == $pkg)
-               | select(any(.targets[]; .name == $bin and (.kind | index("bin"))))
-               | "\(.name) \(.version)"')"
-          if [ -z "${matches}" ]; then
-            if [ -n "${PACKAGE}" ]; then
-              echo "::error::Package ${PACKAGE} has no binary named ${BINARY}"
-            else
-              echo "::error::No workspace package has a binary named ${BINARY}"
-            fi
-            exit 1
-          fi
-          if [ "$(printf '%s\n' "${matches}" | grep -c .)" -ne 1 ]; then
-            echo "::error::More than one package has a binary named ${BINARY}: ${matches//$'\n'/, }. Set the package input to pick one."
-            exit 1
-          fi
-          read -r owner version <<< "${matches}"
-          if [ "${GITHUB_REF_NAME}" != "v${version}" ]; then
-            echo "::error::Tag ${GITHUB_REF_NAME} does not match ${owner} version ${version}, expected v${version}"
-            exit 1
-          fi
-          {
-            echo "package=${owner}"
-            echo "version=${version}"
-          } >> "${GITHUB_OUTPUT}"
+        run: .pipeline-rust/scripts/release-binaries/check-version.sh
 
       - name: Build
         env:
@@ -193,37 +197,7 @@ jobs:
           cargo build --release --locked --target "${TARGET}" --package "${OWNER_PACKAGE}" --bin "${BINARY}"
 
       - name: Check the glibc version the binary needs
-        run: |
-          set -euo pipefail
-          objdump=objdump
-          if [ "${TARGET}" = "aarch64-unknown-linux-gnu" ]; then
-            objdump=aarch64-linux-gnu-objdump
-          fi
-          # objdump exits 1 with "not a dynamic object" for a static binary,
-          # which needs no glibc at run time.
-          if ! symbols="$("${objdump}" -T "target/${TARGET}/release/${BINARY}" 2>&1)"; then
-            if ! grep -q 'not a dynamic object' <<< "${symbols}"; then
-              printf '%s\n' "${symbols}"
-              echo "::error::${objdump} could not read the symbols of ${BINARY} for ${TARGET}"
-              exit 1
-            fi
-            symbols=""
-          fi
-          needed="$(grep -o 'GLIBC_[0-9.]*' <<< "${symbols}" | sort -uV | tail -n 1 || true)"
-          if [ -z "${needed}" ]; then
-            echo "${BINARY} for ${TARGET} needs no glibc symbols"
-            exit 0
-          fi
-          needed="${needed#GLIBC_}"
-          echo "${BINARY} for ${TARGET} needs glibc ${needed}"
-          if [ -z "${MAX_GLIBC}" ]; then
-            exit 0
-          fi
-          lowest="$(printf '%s\n%s\n' "${needed}" "${MAX_GLIBC}" | sort -V | head -n 1)"
-          if [ "${lowest}" != "${needed}" ]; then
-            echo "::error::${BINARY} for ${TARGET} needs glibc ${needed}, newer than max-glibc ${MAX_GLIBC}"
-            exit 1
-          fi
+        run: .pipeline-rust/scripts/release-binaries/check-glibc.sh
 
       - name: Package
         id: package
@@ -326,6 +300,25 @@ jobs:
       group: release-binaries-${{ github.ref }}
       cancel-in-progress: false
     steps:
+      # See the build job for why the scripts are fetched this way.
+      - name: Check the pipeline-rust commit is known
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WORKFLOW_REPOSITORY}" ] || [ -z "${WORKFLOW_SHA}" ]; then
+            echo "::error::job.workflow_repository or job.workflow_sha is empty, so the pipeline-rust scripts cannot be fetched at the pinned commit"
+            exit 1
+          fi
+
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pipeline-rust
+          persist-credentials: false
+
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: ${{ inputs.binary }}-*
@@ -351,19 +344,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
-        run: |
-          set -euo pipefail
-          if is_draft="$(gh release view "${TAG}" --json isDraft --jq .isDraft 2>/dev/null)"; then
-            if [ "${is_draft}" != "true" ]; then
-              echo "::error::Release ${TAG} is already published. Delete it or push a new tag."
-              exit 1
-            fi
-            gh release delete "${TAG}" --yes
-          fi
-          prerelease_args=()
-          if [[ "${TAG}" == *-* ]]; then
-            prerelease_args=(--prerelease)
-          fi
-          gh release create "${TAG}" --draft --verify-tag --title "${TAG}" --generate-notes \
-            "${prerelease_args[@]}" -- *.tar.gz SHA256SUMS
-          gh release edit "${TAG}" --draft=false
+        run: ../.pipeline-rust/scripts/release-binaries/publish-release.sh

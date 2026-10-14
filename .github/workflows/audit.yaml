@@ -18,6 +18,35 @@ jobs:
           fetch-depth: 0
           ref: ${{ github.head_ref }}
 
+      # The annotate script below comes from pipeline-rust at the commit the
+      # caller pinned this workflow to; the checkout above is the caller's repo,
+      # which does not have it. An empty workflow_sha would make checkout fall
+      # back to the default branch, so the fetch is skipped instead. Annotation
+      # is best-effort, so neither step can fail the audit. This runs after the
+      # caller checkout, which would otherwise clean it away.
+      - name: Check the pipeline-rust commit is known
+        id: workflow-commit
+        env:
+          WORKFLOW_REPOSITORY: ${{ job.workflow_repository }}
+          WORKFLOW_SHA: ${{ job.workflow_sha }}
+        run: |
+          set -euo pipefail
+          if [ -z "${WORKFLOW_REPOSITORY}" ] || [ -z "${WORKFLOW_SHA}" ]; then
+            echo "::warning::job.workflow_repository or job.workflow_sha is empty, so the pipeline-rust scripts cannot be fetched at the pinned commit. Skipping issue annotation."
+            exit 0
+          fi
+          echo "known=true" >> "${GITHUB_OUTPUT}"
+
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        id: pipeline-scripts
+        if: steps.workflow-commit.outputs.known == 'true'
+        continue-on-error: true
+        with:
+          repository: ${{ job.workflow_repository }}
+          ref: ${{ job.workflow_sha }}
+          path: .pipeline-rust
+          persist-credentials: false
+
       # actions-rust-lang/audit installs cargo-audit UNLOCKED:
       # `cargo install cargo-audit --vers 0.22.0 --no-default-features` (see its
       # action.yml). That re-resolves cargo-audit's own transitive deps to the
@@ -95,8 +124,8 @@ jobs:
       # in a standalone script so it can be tested independently of the workflow -- see the
       # header of that file for the full rationale.
       - name: Annotate issues with direct/transitive dependency info
-        if: always()
+        if: always() && steps.pipeline-scripts.outcome == 'success'
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
-        run: scripts/annotate-audit-dependency-type.sh
+        run: .pipeline-rust/scripts/audit/annotate-audit-dependency-type.sh
