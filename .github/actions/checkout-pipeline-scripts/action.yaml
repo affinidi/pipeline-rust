@@ -1,0 +1,79 @@
+# Checks out pipeline-rust into .pipeline-rust at the commit of the reusable
+# workflow that defines the calling job, so the scripts a job runs match the
+# caller's @<commit> pin.
+# The caller's own checkout is the caller's repository, which does not have
+# them.
+#
+# Workflows reference this action @main rather than a commit SHA: `uses:`
+# takes no expressions, so it cannot follow job.workflow_sha, and a squash
+# merge would leave a SHA pinned inside the same PR off main. This is a
+# deliberate exception to SHA pinning. The scripts stay pinned through the sha
+# input, but this action's own logic is whatever is on main, for every caller.
+# Keep it minimal, and keep it compatible: workflows pinned to older commits
+# still call it, so never remove, rename or make required an input, or change
+# what the fetched output means or the .pipeline-rust path it checks out to.
+#
+# An empty sha would make actions/checkout fall back to the default branch,
+# and a branch or tag name would turn the pin into a moving ref, so the action
+# accepts only a full commit SHA and an owner/repo. Otherwise it fails, or with
+# if-missing: skip warns and sets fetched to false. Run it after the caller's
+# own checkout, which would otherwise clean the checked out scripts away.
+name: Check out pipeline-rust scripts
+description: Check out pipeline-rust at the commit of the reusable workflow that defines the calling job.
+inputs:
+  repository:
+    description: "owner/repo of the reusable workflow. Pass job.workflow_repository."
+    required: true
+  sha:
+    description: "Commit of the reusable workflow. Pass job.workflow_sha."
+    required: true
+  if-missing:
+    description: "What to do when repository or sha is empty or malformed: fail, or skip with a warning."
+    required: false
+    default: fail
+outputs:
+  fetched:
+    description: "true when the scripts were checked out into .pipeline-rust."
+    value: ${{ steps.checkout.outcome == 'success' }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check the pipeline-rust commit is known
+      id: commit
+      shell: bash
+      env:
+        REPOSITORY: ${{ inputs.repository }}
+        SHA: ${{ inputs.sha }}
+        IF_MISSING: ${{ inputs.if-missing }}
+      run: |
+        set -euo pipefail
+        if [ "${IF_MISSING}" != "fail" ] && [ "${IF_MISSING}" != "skip" ]; then
+          echo "::error::if-missing must be fail or skip, got ${IF_MISSING//[$'\r\n']/ }"
+          exit 1
+        fi
+        if [ -z "${REPOSITORY}" ] || [ -z "${SHA}" ]; then
+          message="The repository or sha input is empty (pass job.workflow_repository and job.workflow_sha), so the pipeline-rust scripts cannot be fetched at the pinned commit"
+        elif ! [[ "${SHA}" =~ ^[0-9a-f]{40}$ ]] || ! [[ "${REPOSITORY}" =~ ^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$ ]]; then
+          # CR and LF become spaces so an echoed value cannot start a workflow command.
+          shown="${REPOSITORY//[$'\r\n']/ }@${SHA//[$'\r\n']/ }"
+          message="The repository or sha input has an unexpected shape (${shown}): sha must be a full commit SHA and repository owner/repo, so the pipeline-rust scripts cannot be fetched at a pinned commit"
+        else
+          echo "known=true" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+        if [ "${IF_MISSING}" = "skip" ]; then
+          echo "::warning::${message}. Skipping."
+          exit 0
+        fi
+        echo "::error::${message}"
+        exit 1
+
+    - id: checkout
+      if: steps.commit.outputs.known == 'true'
+      uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.sha }}
+        path: .pipeline-rust
+        persist-credentials: false
