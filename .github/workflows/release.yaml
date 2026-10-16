@@ -118,8 +118,10 @@ jobs:
       # workflow (verifyPublish: true); at release time each crate is verified
       # in isolation by its own `cargo publish -p` below.
 
+      # Workspace path only: the per-crate path mints its own token per crate.
       - name: Authenticate to crates.io (OIDC trusted publishing)
         id: auth
+        if: ${{ inputs.workspace_publish }}
         uses: rust-lang/crates-io-auth-action@v1
         continue-on-error: true  # falls back to CARGO_REGISTRY_TOKEN secret if trusted publisher not configured
 
@@ -228,10 +230,15 @@ jobs:
       #     pass that makes no progress stops early and reports real failures.
       #   * Off `main` (or when release_dry_run) everything runs as `--dry-run`,
       #     so this is fully exercisable from a PR / test branch.
+      #   * A trusted publishing token expires 30 minutes after it is minted,
+      #     and one token for the whole run lost every crate published after
+      #     that. Each crate is verify-built with no token, then uploaded on a
+      #     token minted for it alone and revoked straight after.
       - name: Release (per-crate)
         if: ${{ (github.ref == 'refs/heads/main' || inputs.release_dry_run) && !inputs.workspace_publish }}
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
+          # Used only when a trusted publishing token cannot be minted.
+          FALLBACK_REGISTRY_TOKEN: ${{ secrets.CARGO_REGISTRY_TOKEN }}
           GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DEBUG: ${{ inputs.release_debug }}
           MAX_RETRIES: ${{ inputs.release_max_retries }}
@@ -262,6 +269,50 @@ jobs:
           }
           # True iff $1 is a strictly higher semver than $2.
           version_gt() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+
+          # Trusted publishing exchange, as rust-lang/crates-io-auth-action
+          # does it: a GitHub OIDC token for audience crates.io, swapped for a
+          # crates.io token. Sets $token; fails if trusted publishing is not set up.
+          tp_endpoint="https://crates.io/api/v1/trusted_publishing/tokens"
+          mint_token() {
+            local jwt
+            token=""
+            [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || return 1
+            jwt="$(curl -fsS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crates.io" | jq -r '.value // empty')" || return 1
+            [ -n "$jwt" ] || return 1
+            echo "::add-mask::$jwt"
+            token="$(jq -n --arg jwt "$jwt" '{jwt: $jwt}' \
+              | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- "$tp_endpoint" \
+              | jq -r '.token // empty')" || return 1
+            [ -n "$token" ] || return 1
+            echo "::add-mask::$token"
+          }
+          revoke_token() {
+            curl -fsS -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
+              || echo "::warning::could not revoke a trusted publishing token; it expires within 30 minutes"
+          }
+
+          # Verify-build first with no token, then upload on a fresh one.
+          publish_crate() {
+            local rc
+            if [ -n "$dry" ]; then
+              cargo publish -p "$1" --dry-run
+              return
+            fi
+            cargo package -p "$1" || return 1
+            if mint_token; then
+              CARGO_REGISTRY_TOKEN="$token" cargo publish -p "$1" --no-verify
+              rc=$?
+              revoke_token "$token"
+              return "$rc"
+            fi
+            if [ -z "${FALLBACK_REGISTRY_TOKEN}" ]; then
+              echo "::error::no trusted publishing token could be minted and no CARGO_REGISTRY_TOKEN secret is set"
+              return 1
+            fi
+            CARGO_REGISTRY_TOKEN="${FALLBACK_REGISTRY_TOKEN}" cargo publish -p "$1" --no-verify
+          }
 
           # Local versions of every publishable workspace crate (one metadata call).
           declare -A ver
@@ -301,7 +352,7 @@ jobs:
             progress=0
             for name in "${round[@]}"; do
               echo "::group::[$retries/$MAX_RETRIES] publish $name@${ver[$name]} $dry"
-              if cargo publish -p "$name" $dry; then
+              if publish_crate "$name"; then
                 echo "published $name@${ver[$name]}"
                 published+=("$name@${ver[$name]}")
                 progress=1
