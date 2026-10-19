@@ -19,8 +19,9 @@ inputs:
     required: false
     default: origin/nightly
   token:
-    description: "Token that pushes the release branch and opens the PR."
-    required: true
+    description: "Token that pushes the release branch and opens the PR. Not needed for a dry run."
+    required: false
+    default: ""
   dry-run:
     description: "Build both commits and push nothing."
     required: false
@@ -39,8 +40,13 @@ runs:
         NAME: ${{ inputs.name }}
         FROM: ${{ inputs.from }}
         DRY_RUN: ${{ inputs.dry-run }}
+        HAS_TOKEN: ${{ inputs.token != '' }}
       run: |
         set -euo pipefail
+        if [ "${DRY_RUN}" != "true" ] && [ "${HAS_TOKEN}" != "true" ]; then
+          echo "::error::token is empty: a cut pushes a branch and opens a PR, and GITHUB_TOKEN would trigger no workflow on them"
+          exit 1
+        fi
         [[ "${NAME}" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "::error::name must be major.minor"; exit 1; }
         [[ "${FROM}" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "::error::from must be a revision name"; exit 1; }
         [[ "${DRY_RUN}" =~ ^(true|false)$ ]] || { echo "::error::dry-run must be true or false"; exit 1; }
@@ -48,7 +54,7 @@ runs:
       with:
         fetch-depth: 0
         # cut-release.py pushes through origin with this token.
-        token: ${{ inputs.token }}
+        token: ${{ inputs.token || github.token }}
     - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
       with:
         toolchain: ${{ inputs.toolchain }}

@@ -24,6 +24,16 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Check the token is set
+      shell: bash
+      env:
+        HAS_TOKEN: ${{ inputs.token != '' }}
+      run: |
+        set -euo pipefail
+        if [ "${HAS_TOKEN}" != "true" ]; then
+          echo "::error::token is empty: pass a GitHub App or fine-grained token (see the action's header)"
+          exit 1
+        fi
     - name: Check the ref is a release branch
       shell: bash
       env:

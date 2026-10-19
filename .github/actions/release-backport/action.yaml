@@ -16,6 +16,16 @@ inputs:
 runs:
   using: composite
   steps:
+    - name: Check the token is set
+      shell: bash
+      env:
+        HAS_TOKEN: ${{ inputs.token != '' }}
+      run: |
+        set -euo pipefail
+        if [ "${HAS_TOKEN}" != "true" ]; then
+          echo "::error::token is empty: pass a GitHub App or fine-grained token (see the action's header)"
+          exit 1
+        fi
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
         token: ${{ inputs.token }}
