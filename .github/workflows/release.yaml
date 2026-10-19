@@ -72,7 +72,7 @@ jobs:
       #     tools-cache: true
 
       # https://github.com/actions/create-github-app-token
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         id: app-token
         with:
           owner: ${{ github.repository_owner }}
@@ -81,7 +81,7 @@ jobs:
           app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
           private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
@@ -93,7 +93,7 @@ jobs:
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
@@ -122,7 +122,7 @@ jobs:
       - name: Authenticate to crates.io (OIDC trusted publishing)
         id: auth
         if: ${{ inputs.workspace_publish }}
-        uses: rust-lang/crates-io-auth-action@v1
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
         continue-on-error: true  # falls back to CARGO_REGISTRY_TOKEN secret if trusted publisher not configured
 
       # - name: Release
@@ -289,7 +289,7 @@ jobs:
           }
           revoke_token() {
             curl -fsS -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
-              || echo "::warning::could not revoke a trusted publishing token; it expires within 30 minutes"
+              || echo "::warning::could not revoke the trusted publishing token for $2; it expires within 30 minutes"
           }
 
           # Verify-build first with no token, then upload on a fresh one.
@@ -312,7 +312,7 @@ jobs:
             fi
             CARGO_REGISTRY_TOKEN="$token" cargo publish -p "$1" --no-verify
             rc=$?
-            revoke_token "$token"
+            revoke_token "$token" "$1"
             return "$rc"
           }
 
