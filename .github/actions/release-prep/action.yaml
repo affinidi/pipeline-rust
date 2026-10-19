@@ -1,0 +1,74 @@
+# Opens the PR that prepares the next rc, GA or patch on release/<major.minor>:
+# moves RELEASE, writes the CHANGELOG section and, for a patch, moves the whole
+# workspace version. Merging that PR is the release. Run it from a
+# workflow_dispatch workflow with the release branch selected as the ref.
+#
+# token opens the PR. A PR opened with GITHUB_TOKEN runs no CI, and an
+# organisation may not let GITHUB_TOKEN open PRs at all, so pass a GitHub App
+# or fine-grained token with contents and pull-requests write.
+name: Prepare a release
+description: Open the PR that prepares the next rc, GA or patch of a release branch.
+
+inputs:
+  kind:
+    description: "rc (next candidate), ga (rc.N to .0) or patch (.N to .N+1)"
+    required: true
+  token:
+    description: "Token that pushes the prep branch and opens the PR."
+    required: true
+  toolchain:
+    description: "Rust toolchain for `cargo update -w`. Empty reads rust-toolchain.toml, else stable."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Check the ref is a release branch
+      shell: bash
+      env:
+        REF: ${{ github.ref }}
+        KIND: ${{ inputs.kind }}
+      run: |
+        set -euo pipefail
+        case "${REF}" in
+          refs/heads/release/*) ;;
+          *) echo "::error::run this on a release/<major.minor> branch, not ${REF}"; exit 1 ;;
+        esac
+        case "${KIND}" in
+          rc|ga|patch) ;;
+          *) echo "::error::kind must be rc, ga or patch"; exit 1 ;;
+        esac
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # A patch's changelog is the commits since the last `v…` tag.
+        fetch-depth: 0
+        persist-credentials: false
+    - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        rustflags: ""
+        cache: false
+    - name: Bump versions, write the changelog, move RELEASE
+      shell: bash
+      env:
+        KIND: ${{ inputs.kind }}
+      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/prepare-release.py" --kind "${KIND}" --pr-body "${RUNNER_TEMP}/body.md"
+    - name: Open the PR
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BASE: ${{ github.ref_name }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        target=$(cat RELEASE)
+        head="release-prep/${BASE#release/}/${target}"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git switch -c "${head}"
+        git add -A
+        git commit -s -m "chore(release): v${target}"
+        git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
+        gh pr create --base "${BASE}" --head "${head}" --title "chore(release): v${target}" \
+          --body-file "${RUNNER_TEMP}/body.md"

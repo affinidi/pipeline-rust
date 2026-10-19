@@ -1,0 +1,72 @@
+# Tags v<RELEASE> and opens its GitHub Release, on a push to a release branch
+# that moves RELEASE (the cut, or a merged prep PR). A release candidate
+# (vX.Y.Z-rc.N) is a prerelease and never "latest". The notes are the
+# version's CHANGELOG.md section where it has one, otherwise generated.
+# An existing tag is never moved.
+#
+# token creates the tag. A tag ruleset often lets only an app create tags, and
+# a tag GITHUB_TOKEN creates triggers no workflow, so pass a GitHub App token
+# when anything (an image build, say) hangs off `push: tags`.
+name: Tag a release
+description: Tag v<RELEASE> and publish its GitHub Release.
+
+inputs:
+  token:
+    description: "Token that creates the tag and the GitHub Release (contents write)."
+    required: true
+outputs:
+  tag:
+    description: "The tag, v<RELEASE>."
+    value: ${{ steps.tag.outputs.tag }}
+  created:
+    description: "true when this run created the tag."
+    value: ${{ steps.tag.outputs.created }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        persist-credentials: false
+    - name: Tag and publish the GitHub Release
+      id: tag
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        SHA: ${{ github.sha }}
+      run: |
+        set -euo pipefail
+        version=$(tr -d '[:space:]' < RELEASE)
+        if ! [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-rc\.[0-9]+)?$ ]]; then
+          echo "::error::RELEASE does not hold major.minor.patch[-rc.N]"
+          exit 1
+        fi
+        tag="v${version}"
+        echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+        if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
+          echo "::warning::${tag} already exists; not moving it"
+          echo "created=false" >> "${GITHUB_OUTPUT}"
+          exit 0
+        fi
+        # The version's own CHANGELOG section, heading excluded.
+        notes="${RUNNER_TEMP}/notes.md"
+        : > "${notes}"
+        if [ -f CHANGELOG.md ]; then
+          awk -v v="${version}" '
+            $0 ~ "^## " v "( |$)" { on = 1; next }
+            on && /^## / { exit }
+            on { print }
+          ' CHANGELOG.md > "${notes}"
+        fi
+        args=(--target "${SHA}" --title "${tag}")
+        case "${version}" in
+          *-rc.*) args+=(--prerelease --latest=false) ;;
+        esac
+        if [ -s "${notes}" ]; then
+          args+=(--notes-file "${notes}")
+        else
+          args+=(--generate-notes)
+        fi
+        gh release create "${tag}" "${args[@]}"
+        echo "created=true" >> "${GITHUB_OUTPUT}"

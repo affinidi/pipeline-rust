@@ -1,0 +1,22 @@
+# Where a PR may go and what it may change: a fix reaches release/<major.minor>
+# by backport (or with the release-direct label), and only the release tooling
+# moves versions or RELEASE. Call it on pull_request into main and release/**,
+# with types opened, synchronize, reopened, labeled and unlabeled.
+name: Release branch rules
+description: Check a PR against the release-branch rules.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # The merge commit and its first parent: the PR's effect on the base.
+        fetch-depth: 2
+        persist-credentials: false
+    - name: Check the PR against the branch rules
+      shell: bash
+      env:
+        BASE_REF: ${{ github.base_ref }}
+        HEAD_REF: ${{ github.head_ref }}
+        LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-branch-rules.py"
