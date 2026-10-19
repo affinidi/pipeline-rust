@@ -1,0 +1,76 @@
+# Cuts release/<major.minor>: pushes the branch at <major.minor>.0 with RELEASE
+# = <major.minor>.0-rc.0, opens the release-cut/<major.minor> PR that moves main
+# to the next minor, and creates the `backport release/<major.minor>` label.
+# Run it from a workflow_dispatch workflow on main.
+#
+# token pushes the branch and opens the PR. It must not be GITHUB_TOKEN: a
+# branch GITHUB_TOKEN pushes triggers no workflow, so the rc.0 would never be
+# tagged. Pass a GitHub App or fine-grained token with contents and
+# pull-requests write.
+name: Cut a release
+description: Create release/<major.minor> and open the PR that moves main to the next minor.
+
+inputs:
+  name:
+    description: "major.minor of the release, e.g. 0.42"
+    required: true
+  from:
+    description: "Revision to cut from. The first cut, before a nightly branch exists, is origin/main."
+    required: false
+    default: origin/nightly
+  token:
+    description: "Token that pushes the release branch and opens the PR. Not needed for a dry run."
+    required: false
+    default: ""
+  dry-run:
+    description: "Build both commits and push nothing."
+    required: false
+    default: "false"
+  toolchain:
+    description: "Rust toolchain for `cargo update -w`. Empty reads rust-toolchain.toml, else stable."
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Check the inputs
+      shell: bash
+      env:
+        NAME: ${{ inputs.name }}
+        FROM: ${{ inputs.from }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        HAS_TOKEN: ${{ inputs.token != '' }}
+      run: |
+        set -euo pipefail
+        if [ "${DRY_RUN}" != "true" ] && [ "${HAS_TOKEN}" != "true" ]; then
+          echo "::error::token is empty: a cut pushes a branch and opens a PR, and GITHUB_TOKEN would trigger no workflow on them"
+          exit 1
+        fi
+        [[ "${NAME}" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "::error::name must be major.minor"; exit 1; }
+        [[ "${FROM}" =~ ^[A-Za-z0-9._/-]+$ ]] || { echo "::error::from must be a revision name"; exit 1; }
+        [[ "${DRY_RUN}" =~ ^(true|false)$ ]] || { echo "::error::dry-run must be true or false"; exit 1; }
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        fetch-depth: 0
+        # cut-release.py pushes through origin with this token.
+        token: ${{ inputs.token || github.token }}
+    - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        rustflags: ""
+        cache: false
+    - name: Cut
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        NAME: ${{ inputs.name }}
+        FROM: ${{ inputs.from }}
+        DRY_RUN: ${{ inputs.dry-run }}
+      run: |
+        set -euo pipefail
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        args=("${NAME}" --from "${FROM}")
+        [ "${DRY_RUN}" = "true" ] && args+=(--dry-run)
+        python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/cut-release.py" "${args[@]}"

@@ -105,6 +105,62 @@ Release rules:
 - The tag must equal `v` plus the version in the owning package's
   `Cargo.toml`, so `v1.4.0` for version `1.4.0`.
 
+## Release branches
+
+An alternative to `release.yaml` for a workspace that versions every crate in
+lockstep and supports releases on their own branches. `main` carries the next
+version and never publishes; a release is cut to `release/<major.minor>`,
+stabilised with release candidates, published at GA and patched by backport.
+
+| Step | Action | `RELEASE` | Tag | crates.io |
+|---|---|---|---|---|
+| Cut | `release-cut` | `0.4.0-rc.0` | `v0.4.0-rc.0` (prerelease) | no |
+| Next candidate | `release-prep`, kind `rc` | `0.4.0-rc.N` | `v0.4.0-rc.N` | no |
+| GA | `release-prep`, kind `ga` | `0.4.0` | `v0.4.0` | `0.4.0` |
+| Patch | `release-prep`, kind `patch` | `0.4.N` | `v0.4.N` | `0.4.N` |
+
+Merging a prep PR is the release: `release-tag` tags it and `release-publish`
+publishes it. The other actions keep the flow honest: `release-guards`
+(lockstep versions, CHANGELOG.md and RELEASE agree), `release-branch-rules`
+(fixes reach a release branch by backport, only the tooling moves versions),
+`release-backport`, `release-nightly` (cuts come from the newest fully green
+`main`) and `release-dco`.
+
+They are composite actions under `.github/actions/release-*`; each checks out
+the repository itself. The scripts they run are in `scripts/release-branch`
+and come with the action at the ref you pin, so nothing is copied into your
+repository. They need Python 3.11 or later on the runner.
+
+`release-publish` uses crates.io Trusted Publishing only. It verify-builds
+each crate, then mints a token for that crate alone, uploads and revokes it,
+so a long release never outlives a 30-minute token. Because the action runs
+inside your workflow, the trusted publisher on crates.io names your
+repository, your workflow file and its environment:
+
+```yaml
+name: Publish crates   # .github/workflows/publish.yml: the trusted publisher names this file
+
+on:
+  push:
+    branches: ["release/**"]
+  workflow_dispatch:
+
+jobs:
+  publish:
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: affinidi/pipeline-rust/.github/actions/release-publish@<commit>
+```
+
+`release-cut`, `release-prep` and `release-backport` need a `token` that is
+not `GITHUB_TOKEN`: what `GITHUB_TOKEN` pushes or opens triggers no workflow.
+`release-tag` needs one that may create tags under your tag rules.
+
 ## Choosing the runner
 
 `checks.yaml`, `checks-no-test.yaml` and `checks-test-only.yaml` take an

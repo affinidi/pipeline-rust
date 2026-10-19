@@ -1,0 +1,43 @@
+# Cherry-picks a merged PR labelled `backport release/<major.minor>` onto that
+# release branch as a new PR. A cherry-pick that conflicts still opens a PR, as
+# a draft carrying the conflict. Call it on pull_request_target with types
+# closed and labeled; it checks out no PR code to run.
+#
+# token opens the PR. One opened with GITHUB_TOKEN runs no CI, so pass a
+# GitHub App or fine-grained token with contents and pull-requests write.
+name: Backport
+description: Open a backport PR for each `backport release/<major.minor>` label on a merged PR.
+
+inputs:
+  token:
+    description: "Token that pushes the backport branch and opens the PR."
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Check the token is set
+      shell: bash
+      env:
+        HAS_TOKEN: ${{ inputs.token != '' }}
+      run: |
+        set -euo pipefail
+        if [ "${HAS_TOKEN}" != "true" ]; then
+          echo "::error::token is empty: pass a GitHub App or fine-grained token (see the action's header)"
+          exit 1
+        fi
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        token: ${{ inputs.token }}
+    - uses: korthout/backport-action@8560fb503c275d433c56f05a2f64850093baa9f7 # v4.7.0
+      with:
+        github_token: ${{ inputs.token }}
+        label_pattern: '^backport (release/\d+\.\d+)$'
+        pull_title: '${pull_title}'
+        pull_description: |-
+          Backport of #${pull_number} to `${target_branch}`.
+
+          ${pull_description}
+        add_labels: backport
+        copy_assignees: true
+        experimental: '{"conflict_resolution": "draft_commit_conflicts"}'
