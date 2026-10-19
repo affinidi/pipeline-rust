@@ -204,11 +204,11 @@ def mint_token():
     return token
 
 
-def revoke_token(token):
+def revoke_token(token, name):
     try:
         http_json("DELETE", TRUSTED_PUBLISHING, {"Authorization": f"Bearer {token}"})
     except (urllib.error.URLError, TimeoutError):
-        print("::warning::could not revoke a Trusted Publishing token; it expires within 30 minutes")
+        print(f"::warning::could not revoke the Trusted Publishing token for {name}; it expires within 30 minutes")
 
 
 def wait_for_index(name, version):
@@ -229,7 +229,7 @@ def upload(name, version):
             rc = cargo("publish", "-p", name, "--locked", "--no-verify", check=False,
                        env={**os.environ, "CARGO_REGISTRY_TOKEN": token})
         finally:
-            revoke_token(token)
+            revoke_token(token, name)
         # A failed attempt may still have landed (the error came after the upload).
         if rc == 0 or version in (published_versions(name) or set()):
             return

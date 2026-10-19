@@ -65,7 +65,11 @@ def toolchain_problems():
 
 
 def git_show(rev, path):
-    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True, cwd=ROOT)
+    """`path` at `rev`, or None if absent there; exits if `rev` is not a known commit."""
+    git = ["git", "-C", str(ROOT)]
+    if subprocess.run([*git, "cat-file", "-e", f"{rev}^{{commit}}"], capture_output=True).returncode != 0:
+        sys.exit(f"base commit {rev} is not in this checkout; fetch it (fetch-depth: 0) and re-run")
+    out = subprocess.run([*git, "show", f"{rev}:{path}"], capture_output=True, text=True)
     return out.stdout if out.returncode == 0 else None
 
 

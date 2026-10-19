@@ -24,14 +24,14 @@ runs:
         set -euo pipefail
         commits="${RUNNER_TEMP}/dco-commits.tsv"
         gh api --paginate "repos/${REPO}/pulls/${PR}/commits?per_page=100" \
-          --jq '.[] | [.sha, (.parents | length | tostring), .commit.author.email, (.commit.message | @base64)] | @tsv' \
+          --jq '.[] | [.sha, (.parents | length | tostring), (.commit.message | @base64)] | @tsv' \
           > "${commits}"
         bad=0
-        while IFS=$'\t' read -r sha parents email msg64; do
+        while IFS=$'\t' read -r sha parents msg64; do
           [ "${parents}" -gt 1 ] && continue
           msg=$(printf '%s' "${msg64}" | base64 -d)
           if ! printf '%s\n' "${msg}" | grep -qiE '^Signed-off-by: .+ <[^>]+>$'; then
-            echo "::error::commit ${sha:0:12} (${email}) has no Signed-off-by trailer"
+            echo "::error::commit ${sha:0:12} has no Signed-off-by trailer"
             bad=1
           fi
         done < "${commits}"
