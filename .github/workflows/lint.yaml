@@ -1,0 +1,39 @@
+# Lints this repository on its own PRs and pushes to main. Not a reusable
+# workflow: there is nothing here for callers to call.
+name: Lint
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    runs-on: ubuntu-24.04
+    env:
+      # Run blocks in reusable workflows gate on warnings and errors; their
+      # info-level quoting notes are left alone, as quoting changes behaviour.
+      SHELLCHECK_OPTS: --severity=warning
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          version: "0.13.6"
+          enable-cache: false
+      - name: Workflows (actionlint, with shellcheck on run blocks)
+        run: uvx --from actionlint-py==1.7.12.25 --with shellcheck-py==0.11.0.1 actionlint
+      - name: Shell scripts (shellcheck)
+        run: git ls-files -z '*.sh' | xargs -0 -r uvx --from shellcheck-py==0.11.0.1 shellcheck
+      - name: YAML (yamllint)
+        run: uvx yamllint==1.38.0 --strict .
+      - name: Python lint (ruff check)
+        run: uvx ruff@0.17.3 check
+      - name: Python format (ruff format)
+        run: uvx ruff@0.17.3 format --check
+      - name: Python types (uv check)
+        run: uv check --no-project --preview-features check-command --ty-version 0.0.93
