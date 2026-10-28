@@ -37,6 +37,16 @@ on:
         required: false
         type: string
         default: ubuntu-24.04
+    secrets:
+      SNYK_SCANNER_TOKEN:
+        description: Snyk token for the security scan
+        required: false
+      SNYK_SCANNER_REGION:
+        description: Snyk region for the security scan
+        required: false
+      SNYK_GLOBAL_POLICY:
+        description: Snyk policy for the security scan
+        required: false
 
 jobs:
   audit:
@@ -74,9 +84,15 @@ jobs:
 
   rust-scan:
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    # The scanner only reads the code: pass it its own secrets, not every one.
+    permissions:
+      contents: read
     with:
       repo-path: ${{ inputs.repo-path }}
-    secrets: inherit
+    secrets:
+      SNYK_SCANNER_TOKEN: ${{ secrets.SNYK_SCANNER_TOKEN }}
+      SNYK_SCANNER_REGION: ${{ secrets.SNYK_SCANNER_REGION }}
+      SNYK_GLOBAL_POLICY: ${{ secrets.SNYK_GLOBAL_POLICY }}
 
   verify-publish:
     if: ${{ inputs.verifyPublish }}
