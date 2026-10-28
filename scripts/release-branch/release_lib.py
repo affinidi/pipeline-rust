@@ -121,8 +121,7 @@ def lockstep_problems(root):
         v = pkg.get("version")
         if not (isinstance(v, dict) and v.get("workspace")):
             problems.append(
-                f"{manifest.relative_to(root)}: [package] version must be "
-                f"`version.workspace = true` (found {v!r})"
+                f"{manifest.relative_to(root)}: [package] version must be `version.workspace = true` (found {v!r})"
             )
     for manifest, name, req in internal_requirements(root):
         if req != version:
@@ -158,16 +157,14 @@ def set_version(root, version):
     head, sep, rest = text.partition("[workspace.package]")
     if not sep:
         raise SystemExit(f"{cargo_toml}: no [workspace.package] section")
-    rest, n = re.subn(
-        r'^version\s*=\s*"[^"]*"', lambda _: f'version = "{version}"', rest, count=1, flags=re.MULTILINE
-    )
+    rest, n = re.subn(r'^version\s*=\s*"[^"]*"', lambda _: f'version = "{version}"', rest, count=1, flags=re.MULTILINE)
     if n != 1:
         raise SystemExit(f"{cargo_toml}: no version line in [workspace.package]")
     cargo_toml.write_text(head + sep + rest)
 
     names = member_names(root)
     pin_re = re.compile(
-        r'^(\s*(?:' + "|".join(map(re.escape, names)) + r')\s*=\s*\{[^}\n]*?\bversion\s*=\s*")[^"]*(")',
+        r"^(\s*(?:" + "|".join(map(re.escape, names)) + r')\s*=\s*\{[^}\n]*?\bversion\s*=\s*")[^"]*(")',
         re.MULTILINE,
     )
     for manifest in [cargo_toml, *members(root)]:
@@ -195,6 +192,6 @@ def unreleased_split(changelog):
     m = re.search(r"^## Unreleased[^\n]*\n", changelog, re.MULTILINE)
     if not m:
         return None
-    nxt = re.search(r"^## ", changelog[m.end():], re.MULTILINE)
+    nxt = re.search(r"^## ", changelog[m.end() :], re.MULTILINE)
     end = m.end() + nxt.start() if nxt else len(changelog)
-    return changelog[: m.start()], changelog[m.end(): end], changelog[end:]
+    return changelog[: m.start()], changelog[m.end() : end], changelog[end:]

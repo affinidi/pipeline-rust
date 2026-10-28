@@ -54,9 +54,7 @@ def toolchain_problems():
         for lineno, line in enumerate(wf.read_text().splitlines(), 1):
             m = pin.match(line)
             if m and m.group(1) != channel:
-                problems.append(
-                    f"{wf.relative_to(ROOT)}:{lineno}: toolchain {m.group(1)!r}, expected {channel!r}"
-                )
+                problems.append(f"{wf.relative_to(ROOT)}:{lineno}: toolchain {m.group(1)!r}, expected {channel!r}")
     rv = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"].get("package", {}).get("rust-version")
     numeric = r"\d+\.\d+(\.\d+)?"
     if rv and re.fullmatch(numeric, rv) and re.fullmatch(numeric, channel) and vtuple(rv) > vtuple(channel):
@@ -109,7 +107,9 @@ def release_problems(base_sha):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--base-sha", help="the PR's base or the commit before the push, to check RELEASE only moves forward")
+    ap.add_argument(
+        "--base-sha", help="the PR's base or the commit before the push, to check RELEASE only moves forward"
+    )
     args = ap.parse_args()
     if args.base_sha and not re.fullmatch(r"[0-9a-f]{40}", args.base_sha):
         sys.exit(f"--base-sha {args.base_sha!r} is not a full commit SHA")

@@ -85,12 +85,12 @@ def main():
                 split = bool(src and cur and src[1] == cur[1])
                 if split:
                     before, body, after = cur
-                    main_changelog.write_text(
-                        f"{before}## Unreleased\n\n## {version} ({branch})\n{body}{after}"
-                    )
+                    main_changelog.write_text(f"{before}## Unreleased\n\n## {version} ({branch})\n{body}{after}")
             git("add", "-A", cwd=mn)
             git(
-                "commit", "-s", "-m",
+                "commit",
+                "-s",
+                "-m",
                 f"chore(release): cut {branch}; main moves to {next_version}",
                 cwd=mn,
             )
@@ -112,12 +112,26 @@ def main():
             cut_head = f"release-cut/{args.name}"
             git("push", "origin", f"HEAD:refs/heads/{cut_head}", cwd=mn)
             run(
-                "gh", "label", "create", f"backport {branch}", "--force",
-                "--color", "5319e7", "--description", f"Cherry-pick onto {branch} once merged",
+                "gh",
+                "label",
+                "create",
+                f"backport {branch}",
+                "--force",
+                "--color",
+                "5319e7",
+                "--description",
+                f"Cherry-pick onto {branch} once merged",
             )
             run(
-                "gh", "pr", "create", "--base", "main", "--head", cut_head,
-                "--title", f"chore(release): cut {branch}; main moves to {next_version}",
+                "gh",
+                "pr",
+                "create",
+                "--base",
+                "main",
+                "--head",
+                cut_head,
+                "--title",
+                f"chore(release): cut {branch}; main moves to {next_version}",
                 "--body",
                 f"Cuts `{branch}` from `{source[:12]}` ({args.source}). "
                 f"`main` moves to `{next_version}`."

@@ -80,7 +80,10 @@ def cargo(*args, check=True, env=None):
 def metadata():
     out = subprocess.run(
         ["cargo", "metadata", "--format-version", "1", "--no-deps"],
-        cwd=ROOT, capture_output=True, text=True, check=True,
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        check=True,
     )
     return json.loads(out.stdout)
 
@@ -226,8 +229,15 @@ def upload(name, version):
     for attempt in range(1, UPLOAD_ATTEMPTS + 1):
         token = mint_token()
         try:
-            rc = cargo("publish", "-p", name, "--locked", "--no-verify", check=False,
-                       env={**os.environ, "CARGO_REGISTRY_TOKEN": token})
+            rc = cargo(
+                "publish",
+                "-p",
+                name,
+                "--locked",
+                "--no-verify",
+                check=False,
+                env={**os.environ, "CARGO_REGISTRY_TOKEN": token},
+            )
         finally:
             revoke_token(token, name)
         # A failed attempt may still have landed (the error came after the upload).

@@ -82,7 +82,7 @@ def main():
     bootstrap = version_of(manifest("HEAD^1", "Cargo.toml"), "Cargo.toml") is None
 
     versions = []
-    for path in ([] if bootstrap else changed):
+    for path in [] if bootstrap else changed:
         if path == "Cargo.toml" or path.endswith("/Cargo.toml"):
             before = version_of(manifest("HEAD^1", path), path)
             after = version_of(manifest("HEAD", path), path)
