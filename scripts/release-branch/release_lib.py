@@ -164,7 +164,7 @@ def set_version(root, version):
 
     names = member_names(root)
     pin_re = re.compile(
-        r"^(\s*(?:" + "|".join(map(re.escape, names)) + r')\s*=\s*\{[^}\n]*?\bversion\s*=\s*")[^"]*(")',
+        r"^(\s*(?:" + "|".join(re.escape(n) for n in names) + r')\s*=\s*\{[^}\n]*?\bversion\s*=\s*")[^"]*(")',
         re.MULTILINE,
     )
     for manifest in [cargo_toml, *members(root)]:
