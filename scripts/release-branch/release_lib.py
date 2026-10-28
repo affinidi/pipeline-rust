@@ -79,14 +79,14 @@ def publishable_crates(root):
 
 
 def _dep_tables(data):
-    """Yield every dependency table in a parsed manifest, target-specific ones included."""
+    """Yield (kind, table) for every dependency table in a parsed manifest, target-specific ones included."""
     for t in DEP_TABLES:
         if t in data:
-            yield data[t]
+            yield t, data[t]
     for target in data.get("target", {}).values():
         for t in DEP_TABLES:
             if t in target:
-                yield target[t]
+                yield t, target[t]
 
 
 def internal_requirements(root):
@@ -99,8 +99,8 @@ def internal_requirements(root):
         if manifest == root / "Cargo.toml":
             ws_deps = data.get("workspace", {}).get("dependencies")
             if ws_deps:
-                tables.append(ws_deps)
-        for table in tables:
+                tables.append(("workspace.dependencies", ws_deps))
+        for kind, table in tables:
             for key, spec in table.items():
                 name = spec.get("package", key) if isinstance(spec, dict) else key
                 if name not in names:
@@ -108,6 +108,8 @@ def internal_requirements(root):
                 req = spec if isinstance(spec, str) else spec.get("version")
                 if isinstance(spec, dict) and spec.get("workspace"):
                     continue  # inherits from [workspace.dependencies], checked there
+                if kind == "dev-dependencies" and req is None and isinstance(spec, dict) and "path" in spec:
+                    continue  # cargo drops a path-only dev-dependency on publish
                 out.append((manifest, name, req))
     return out
 

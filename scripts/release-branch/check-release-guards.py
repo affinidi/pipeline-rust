@@ -12,7 +12,8 @@ at the worst moment — mid-cut, or mid-publish:
      `rust-version` must not exceed it.
   2. lockstep — every member inherits `version.workspace = true`, and every
      internal dependency requires exactly the workspace version
-     (`{ version = "0.42.0", path = ... }`). `set_version` moves them together;
+     (`{ version = "0.42.0", path = ... }`); a path-only dev-dependency is exempt,
+     as cargo drops it on publish. `set_version` moves them together;
      a hand-edited one drifts, and a published crate then requires a sibling
      version that is never published.
   3. changelog — CHANGELOG.md exists at the root. On main it has an
