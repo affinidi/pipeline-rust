@@ -238,7 +238,6 @@ jobs:
       - name: Release (per-crate)
         if: ${{ (github.ref == 'refs/heads/main' || inputs.release_dry_run) && !inputs.workspace_publish }}
         env:
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DEBUG: ${{ inputs.release_debug }}
           MAX_RETRIES: ${{ inputs.release_max_retries }}
           # Branches never publish for real — only a push to main with
