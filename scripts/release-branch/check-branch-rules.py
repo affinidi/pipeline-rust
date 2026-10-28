@@ -44,7 +44,7 @@ def git(*args):
 
 
 def manifest(rev, path):
-    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True)
+    out = subprocess.run(["git", "show", f"{rev}:{path}"], capture_output=True, text=True, check=False)
     if out.returncode:
         return None
     try:

@@ -32,7 +32,7 @@ DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
 
 
 def run(*args, cwd=ROOT, check=True):
-    out = subprocess.run(args, capture_output=True, text=True, cwd=cwd)
+    out = subprocess.run(args, capture_output=True, text=True, cwd=cwd, check=False)
     if check and out.returncode:
         raise SystemExit(f"`{' '.join(args)}` failed in {cwd}:\n{out.stderr.strip()}")
     return out
@@ -65,9 +65,7 @@ def is_publishable(pkg, root):
     publish = pkg.get("publish", True)
     if isinstance(publish, dict) and publish.get("workspace"):
         publish = root_manifest(root)["workspace"].get("package", {}).get("publish", True)
-    if publish is False or publish == []:
-        return False
-    return True
+    return publish is not False and publish != []
 
 
 def publishable_crates(root):

@@ -71,7 +71,7 @@ def output(**kv):
 
 def cargo(*args, check=True, env=None):
     print(f"$ cargo {' '.join(args)}", flush=True)
-    out = subprocess.run(["cargo", *args], cwd=ROOT, env=env)
+    out = subprocess.run(["cargo", *args], cwd=ROOT, env=env, check=False)
     if check and out.returncode:
         sys.exit(f"cargo {' '.join(args)} failed (exit {out.returncode})")
     return out.returncode

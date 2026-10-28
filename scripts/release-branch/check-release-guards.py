@@ -58,18 +58,18 @@ def toolchain_problems():
                     f"{wf.relative_to(ROOT)}:{lineno}: toolchain {m.group(1)!r}, expected {channel!r}"
                 )
     rv = tomllib.loads((ROOT / "Cargo.toml").read_text())["workspace"].get("package", {}).get("rust-version")
-    if rv and re.fullmatch(r"\d+\.\d+(\.\d+)?", rv) and re.fullmatch(r"\d+\.\d+(\.\d+)?", channel):
-        if vtuple(rv) > vtuple(channel):
-            problems.append(f"Cargo.toml rust-version {rv} is above the toolchain channel {channel}")
+    numeric = r"\d+\.\d+(\.\d+)?"
+    if rv and re.fullmatch(numeric, rv) and re.fullmatch(numeric, channel) and vtuple(rv) > vtuple(channel):
+        problems.append(f"Cargo.toml rust-version {rv} is above the toolchain channel {channel}")
     return problems
 
 
 def git_show(rev, path):
     """`path` at `rev`, or None if absent there; exits if `rev` is not a known commit."""
     git = ["git", "-C", str(ROOT)]
-    if subprocess.run([*git, "cat-file", "-e", f"{rev}^{{commit}}"], capture_output=True).returncode != 0:
+    if subprocess.run([*git, "cat-file", "-e", f"{rev}^{{commit}}"], capture_output=True, check=False).returncode != 0:
         sys.exit(f"base commit {rev} is not in this checkout; fetch it (fetch-depth: 0) and re-run")
-    out = subprocess.run([*git, "show", f"{rev}:{path}"], capture_output=True, text=True)
+    out = subprocess.run([*git, "show", f"{rev}:{path}"], capture_output=True, text=True, check=False)
     return out.stdout if out.returncode == 0 else None
 
 
