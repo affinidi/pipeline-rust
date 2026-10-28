@@ -49,7 +49,7 @@ import urllib.error
 import urllib.request
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from release_lib import ROOT, publishable_crates, workspace_version  # noqa: E402
+from release_lib import ROOT, publishable_crates, workspace_version
 
 INDEX = "https://index.crates.io"
 TRUSTED_PUBLISHING = "https://crates.io/api/v1/trusted_publishing/tokens"

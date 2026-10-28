@@ -35,7 +35,7 @@ import sys
 import tomllib
 
 sys.path.insert(0, str(pathlib.Path(__file__).resolve().parent))
-from release_lib import ROOT, lockstep_problems, parse_release, workspace_version  # noqa: E402
+from release_lib import ROOT, lockstep_problems, parse_release, workspace_version
 
 
 def vtuple(v):
@@ -49,7 +49,7 @@ def toolchain_problems():
         return ["rust-toolchain.toml is missing"]
     channel = tomllib.loads(tc.read_text())["toolchain"]["channel"]
     print(f"toolchain: rust-toolchain.toml channel = {channel}")
-    pin = re.compile(r'^\s*toolchain:\s*"([^"]+)"', re.M)
+    pin = re.compile(r'^\s*toolchain:\s*"([^"]+)"', re.MULTILINE)
     for wf in sorted((ROOT / ".github" / "workflows").glob("*.y*ml")):
         for lineno, line in enumerate(wf.read_text().splitlines(), 1):
             m = pin.match(line)
@@ -84,7 +84,7 @@ def release_problems(base_sha):
 
     if not release_file.exists():
         # main (or a feature branch off it).
-        if not re.search(r"^## Unreleased", text, re.M):
+        if not re.search(r"^## Unreleased", text, re.MULTILINE):
             problems.append("CHANGELOG.md has no `## Unreleased` section (main always carries one)")
         return problems
 
@@ -92,7 +92,7 @@ def release_problems(base_sha):
     major, minor, patch, rc = parse_release(current)
     if f"{major}.{minor}.{patch}" != version:
         problems.append(f"RELEASE is {current} but the workspace version is {version}")
-    if rc is None and not re.search(rf"^## {re.escape(current)}( |$)", text, re.M):
+    if rc is None and not re.search(rf"^## {re.escape(current)}( |$)", text, re.MULTILINE):
         problems.append(f"CHANGELOG.md has no `## {current}` section for the GA/patch RELEASE names")
 
     if not base_sha:
@@ -101,7 +101,7 @@ def release_problems(base_sha):
         before = git_show(base_sha, "RELEASE")
         if before and before.strip() != current:
             b = parse_release(before)
-            key = lambda t: (t[0], t[1], t[2], float("inf") if t[3] is None else t[3])  # noqa: E731
+            key = lambda t: (t[0], t[1], t[2], float("inf") if t[3] is None else t[3])
             if key((major, minor, patch, rc)) <= key(b):
                 problems.append(f"RELEASE moves backwards: {before.strip()} -> {current}")
     return problems

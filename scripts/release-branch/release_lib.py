@@ -161,7 +161,7 @@ def set_version(root, version):
     if not sep:
         raise SystemExit(f"{cargo_toml}: no [workspace.package] section")
     rest, n = re.subn(
-        r'^version\s*=\s*"[^"]*"', lambda _: f'version = "{version}"', rest, count=1, flags=re.M
+        r'^version\s*=\s*"[^"]*"', lambda _: f'version = "{version}"', rest, count=1, flags=re.MULTILINE
     )
     if n != 1:
         raise SystemExit(f"{cargo_toml}: no version line in [workspace.package]")
@@ -170,7 +170,7 @@ def set_version(root, version):
     names = member_names(root)
     pin_re = re.compile(
         r'^(\s*(?:' + "|".join(map(re.escape, names)) + r')\s*=\s*\{[^}\n]*?\bversion\s*=\s*")[^"]*(")',
-        re.M,
+        re.MULTILINE,
     )
     for manifest in [cargo_toml, *members(root)]:
         text = manifest.read_text()
@@ -194,9 +194,9 @@ def parse_release(text):
 
 def unreleased_split(changelog):
     """(before, body, after) around the `## Unreleased` section, or None."""
-    m = re.search(r"^## Unreleased[^\n]*\n", changelog, re.M)
+    m = re.search(r"^## Unreleased[^\n]*\n", changelog, re.MULTILINE)
     if not m:
         return None
-    nxt = re.search(r"^## ", changelog[m.end():], re.M)
+    nxt = re.search(r"^## ", changelog[m.end():], re.MULTILINE)
     end = m.end() + nxt.start() if nxt else len(changelog)
     return changelog[: m.start()], changelog[m.end(): end], changelog[end:]
