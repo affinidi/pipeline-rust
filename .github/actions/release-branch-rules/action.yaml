@@ -11,6 +11,11 @@ inputs:
     description: "Login of the GitHub App that opens cut, prep and backport PRs."
     required: false
     default: "affinidi-semantic-release[bot]"
+  maintainer-cuts:
+    # Transitional, for a repository that still cuts with a local script; switch to the release-cut workflow and drop it.
+    description: "Also accept a cut PR opened by a person with the admin or maintain role."
+    required: false
+    default: "false"
 
 runs:
   using: composite
@@ -30,4 +35,6 @@ runs:
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         AUTHOR: ${{ github.event.pull_request.user.login }}
         RELEASE_BOT: ${{ inputs.release-bot }}
+        MAINTAINER_CUTS: ${{ inputs.maintainer-cuts }}
+        GITHUB_TOKEN: ${{ github.token }}
       run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-branch-rules.py"

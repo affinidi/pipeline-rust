@@ -26,9 +26,14 @@ or here. A backport, prep or cut PR counts as one only when the release
 tooling opened it, that is, from a branch of this repository by the release
 bot, not just any GitHub App.
 
+With MAINTAINER_CUTS=true, a cut PR also counts when a person with the admin
+or maintain role opened it from this repository: a repository that still cuts
+with a local script, until it moves to the release-cut workflow.
+
 Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
-HEAD_REPO (the PR head's repository), AUTHOR (the PR author's login) and
-RELEASE_BOT (the release bot's login, `<app-slug>[bot]`).
+HEAD_REPO (the PR head's repository), AUTHOR (the PR author's login),
+RELEASE_BOT (the release bot's login, `<app-slug>[bot]`), MAINTAINER_CUTS,
+and GITHUB_TOKEN with GITHUB_API_URL to read the author's role.
 """
 
 import json
@@ -37,6 +42,9 @@ import re
 import subprocess
 import sys
 import tomllib
+import urllib.error
+import urllib.parse
+import urllib.request
 
 
 def git(*args):
@@ -62,6 +70,23 @@ def version_of(data, path):
     if isinstance(v, dict):
         return "workspace" if v.get("workspace") else None
     return v
+
+
+def is_maintainer(repo, login):
+    """True if `login` holds the admin or maintain role on `repo`; a non-collaborator is not."""
+    api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    url = f"{api}/repos/{repo}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}", "Accept": "application/vnd.github+json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp).get("role_name") in ("admin", "maintain")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        sys.exit(f"could not read {login}'s role on {repo}: HTTP {e.code}")
 
 
 def main():
@@ -109,7 +134,15 @@ def main():
                 "Revert: " + "; ".join(what)
             )
     elif base == "main":
-        if versions and not (tooling and head.startswith("release-cut/")):
+        cut = head.startswith("release-cut/") and (
+            tooling
+            or (
+                os.environ.get("MAINTAINER_CUTS") == "true"
+                and os.environ["HEAD_REPO"] == os.environ["REPO"]
+                and is_maintainer(os.environ["REPO"], os.environ["AUTHOR"])
+            )
+        )
+        if versions and not cut:
             problems.append(
                 "A PR never edits the workspace version: main carries the next release's "
                 "version, set when a release is cut (RELEASES.md). Revert: " + "; ".join(versions)
