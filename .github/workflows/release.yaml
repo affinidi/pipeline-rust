@@ -51,6 +51,12 @@ on:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
         required: false
+      RELEASE_BOT_APP_ID:
+        description: GitHub App ID of the release bot that pushes tags
+        required: false
+      RELEASE_BOT_PRIVATE_KEY:
+        description: private key of that GitHub App
+        required: false
 jobs:
   rust-scan:
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
