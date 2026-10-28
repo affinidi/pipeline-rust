@@ -315,6 +315,7 @@ jobs:
           }
 
           # Verify-build first with no token, then upload on a fresh one.
+          # --no-verify skips only that rebuild: publish still refuses an uncommitted tree.
           # A dry run packages the crate with those already dry-run: their new
           # versions are not on crates.io, so a dependent could not resolve them.
           dry_done=()

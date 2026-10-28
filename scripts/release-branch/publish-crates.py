@@ -234,6 +234,7 @@ def upload(name, version):
     for attempt in range(1, UPLOAD_ATTEMPTS + 1):
         token = mint_token()
         try:
+            # --no-verify skips only the rebuild cmd_publish just did: publish still refuses an uncommitted tree.
             rc = cargo(
                 "publish",
                 "-p",
