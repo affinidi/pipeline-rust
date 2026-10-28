@@ -68,7 +68,7 @@ on:
         required: false
 jobs:
   rust-scan:
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@3aeeb2ceac5c60e12ebddf3ae7bdf9cae56c78b5 # main, 2026-09-25
     # The scanner only reads the code: pass it its own secrets, not every one.
     permissions:
       contents: read
