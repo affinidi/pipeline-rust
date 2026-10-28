@@ -17,7 +17,8 @@ token in existence), then mints a fresh crates.io token from the job's OIDC
 identity, uploads with `cargo publish --no-verify` (seconds), and revokes the
 token. A token lives 30 minutes, so minting once up front lets a long release
 outlive it; minting per crate cannot. A failed upload is retried on a new
-token. The job needs `permissions: id-token: write`.
+token. A token that cannot be revoked fails the publish, after the other
+crates are up. The job needs `permissions: id-token: write`.
 
 Order: a topological sort of the publishable workspace members over their
 normal and build dependencies on each other, with dev-dependency edges
@@ -207,11 +208,15 @@ def mint_token():
     return token
 
 
+# Crates whose token could not be revoked; cmd_publish fails on them at the end.
+unrevoked = []
+
+
 def revoke_token(token, name):
     try:
         http_json("DELETE", TRUSTED_PUBLISHING, {"Authorization": f"Bearer {token}"})
     except (urllib.error.URLError, TimeoutError):
-        print(f"::warning::could not revoke the Trusted Publishing token for {name}; it expires within 30 minutes")
+        unrevoked.append(name)
 
 
 def wait_for_index(name, version):
@@ -298,6 +303,10 @@ def cmd_publish(args):
             upload(name, version)
             wait_for_index(name, version)
         print("::endgroup::", flush=True)
+    if unrevoked:
+        names = ", ".join(unrevoked)
+        print(f"::error::could not revoke the Trusted Publishing token for: {names}; each expires within 30 minutes")
+        return 1
     return 0
 
 
