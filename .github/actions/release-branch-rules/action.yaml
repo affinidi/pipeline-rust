@@ -1,9 +1,16 @@
 # Where a PR may go and what it may change: a fix reaches release/<major.minor>
 # by backport (or with the release-direct label), and only the release tooling
 # moves versions or RELEASE. Call it on pull_request into main and release/**,
-# with types opened, synchronize, reopened, labeled and unlabeled.
+# with types opened, synchronize, reopened, labeled and unlabeled. release-bot
+# names the app that opens them; the default is Affinidi's release bot.
 name: Release branch rules
 description: Check a PR against the release-branch rules.
+
+inputs:
+  release-bot:
+    description: "Login of the GitHub App that opens cut, prep and backport PRs."
+    required: false
+    default: "affinidi-semantic-release[bot]"
 
 runs:
   using: composite
@@ -21,5 +28,6 @@ runs:
         LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         REPO: ${{ github.repository }}
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
-        AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
+        AUTHOR: ${{ github.event.pull_request.user.login }}
+        RELEASE_BOT: ${{ inputs.release-bot }}
       run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-branch-rules.py"

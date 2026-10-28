@@ -23,10 +23,12 @@ version rules don't apply to the PR that creates it.
 
 A branch name proves nothing on its own: anyone can name a branch, in a fork
 or here. A backport, prep or cut PR counts as one only when the release
-tooling opened it, that is, from a branch of this repository by a GitHub App.
+tooling opened it, that is, from a branch of this repository by the release
+bot, not just any GitHub App.
 
 Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
-HEAD_REPO (the PR head's repository) and AUTHOR_TYPE (the PR author's type).
+HEAD_REPO (the PR head's repository), AUTHOR (the PR author's login) and
+RELEASE_BOT (the release bot's login, `<app-slug>[bot]`).
 """
 
 import json
@@ -66,7 +68,11 @@ def main():
     base = os.environ["BASE_REF"]
     head = os.environ["HEAD_REF"]
     labels = set(json.loads(os.environ.get("LABELS") or "[]"))
-    tooling = os.environ["HEAD_REPO"] == os.environ["REPO"] and os.environ["AUTHOR_TYPE"] == "Bot"
+    bot = os.environ["RELEASE_BOT"]
+    # A user login cannot contain "[", so a user account cannot pass as the bot.
+    if not re.fullmatch(r"[A-Za-z0-9-]+\[bot\]", bot):
+        sys.exit(f"release-bot {bot!r} is not a GitHub App login (<app-slug>[bot])")
+    tooling = os.environ["HEAD_REPO"] == os.environ["REPO"] and os.environ["AUTHOR"] == bot
     changed = git("diff", "--name-only", "HEAD^1", "HEAD").split()
 
     # A base with no `[workspace.package] version` has no workspace version to

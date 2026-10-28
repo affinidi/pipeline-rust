@@ -160,7 +160,9 @@ jobs:
 `release-cut`, `release-prep` and `release-backport` need a GitHub App
 `token`: what `GITHUB_TOKEN` pushes or opens triggers no workflow, and
 `release-branch-rules` accepts a cut, prep or backport PR only from a branch
-of the repository opened by an app, since anyone can name a branch.
+of the repository opened by that app, since anyone can name a branch. Its
+`release-bot` input is the app's login, `affinidi-semantic-release[bot]` by
+default.
 `release-tag` needs one that may create tags under your tag rules.
 
 ## Choosing the runner
