@@ -50,7 +50,7 @@ def main():
     if not m:
         sys.exit(f"release name {args.name!r} is not major.minor")
     major, minor = map(int, m.groups())
-    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", args.source):
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", args.source) or ".." in args.source:
         sys.exit(f"--from {args.source!r} is not a revision name")
     branch = f"release/{args.name}"
     version = f"{args.name}.0"

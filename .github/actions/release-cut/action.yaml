@@ -48,7 +48,7 @@ runs:
           exit 1
         fi
         [[ "${NAME}" =~ ^[0-9]+\.[0-9]+$ ]] || { echo "::error::name must be major.minor"; exit 1; }
-        [[ "${FROM}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] || { echo "::error::from must be a revision name"; exit 1; }
+        [[ "${FROM}" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ && "${FROM}" != *..* ]] || { echo "::error::from must be a revision name"; exit 1; }
         [[ "${DRY_RUN}" =~ ^(true|false)$ ]] || { echo "::error::dry-run must be true or false"; exit 1; }
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:

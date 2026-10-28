@@ -1,6 +1,6 @@
 # Build-free guards for a release-branch repository: toolchain pins agree,
-# versions are lockstep, CHANGELOG.md and RELEASE are consistent, and a PR
-# never moves RELEASE backwards. Run it on every PR and push in the workflow
+# versions are lockstep, CHANGELOG.md and RELEASE are consistent, and no PR
+# or push moves RELEASE backwards. Run it on every PR and push in the workflow
 # whose green run gates a cut. Python 3.11+ on the runner.
 name: Release guards
 description: Check the invariants the release-branch tooling relies on.
@@ -10,11 +10,18 @@ runs:
   steps:
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       with:
-        # The PR's base commit, for "RELEASE never moves backwards".
+        # The PR's base or the commit before the push, for "RELEASE never
+        # moves backwards".
         fetch-depth: 0
         persist-credentials: false
     - name: Release guards
       shell: bash
       env:
-        BASE_SHA: ${{ github.event.pull_request.base.sha }}
-      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-release-guards.py" ${BASE_SHA:+--base-sha "$BASE_SHA"}
+        BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+      run: |
+        set -euo pipefail
+        # A push that creates the branch has no commit before it.
+        if [ "${BASE_SHA}" = "0000000000000000000000000000000000000000" ]; then
+          BASE_SHA=""
+        fi
+        python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-release-guards.py" ${BASE_SHA:+--base-sha "$BASE_SHA"}

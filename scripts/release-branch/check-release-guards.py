@@ -20,8 +20,8 @@ at the worst moment — mid-cut, or mid-publish:
      release branch at a GA or patch version it has that version's section,
      which release-tag.yml turns into the GitHub Release notes.
   4. RELEASE ↔ version — on a release branch, RELEASE's `major.minor.patch` is
-     the workspace version, and a PR (with --base-sha) never moves RELEASE
-     backwards. publish.yml refuses to publish when these disagree; this says
+     the workspace version, and RELEASE never moves backwards from --base-sha
+     (a PR's base, or the commit before a push). publish.yml refuses to publish when these disagree; this says
      so at review time instead.
 
 Exit 1 with every problem listed; 0 when all hold.
@@ -95,7 +95,9 @@ def release_problems(base_sha):
     if rc is None and not re.search(rf"^## {re.escape(current)}( |$)", text, re.M):
         problems.append(f"CHANGELOG.md has no `## {current}` section for the GA/patch RELEASE names")
 
-    if base_sha:
+    if not base_sha:
+        print("no base commit (a new branch, or no --base-sha): RELEASE direction not checked")
+    else:
         before = git_show(base_sha, "RELEASE")
         if before and before.strip() != current:
             b = parse_release(before)
@@ -107,7 +109,7 @@ def release_problems(base_sha):
 
 def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    ap.add_argument("--base-sha", help="the PR's base commit, to check RELEASE only moves forward")
+    ap.add_argument("--base-sha", help="the PR's base or the commit before the push, to check RELEASE only moves forward")
     args = ap.parse_args()
     if args.base_sha and not re.fullmatch(r"[0-9a-f]{40}", args.base_sha):
         sys.exit(f"--base-sha {args.base_sha!r} is not a full commit SHA")
