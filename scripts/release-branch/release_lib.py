@@ -26,6 +26,8 @@ ROOT = pathlib.Path(os.environ.get("RELEASE_ROOT") or os.getcwd()).resolve()
 RELEASE_NAME = re.compile(r"(\d+)\.(\d+)")
 RELEASE_VERSION = re.compile(r"(\d+)\.(\d+)\.(\d+)(?:-rc\.(\d+))?")
 CRATE_VERSION = re.compile(r"\d+\.\d+\.\d+")
+# A released version's CHANGELOG heading: `## 0.42.0 (date)` or `## [0.42.0] – date`.
+VERSION_HEADING = re.compile(r"^## \[?\d+\.\d+\.\d+", re.MULTILINE)
 
 # Dependency tables a manifest may name a workspace member in.
 DEP_TABLES = ("dependencies", "dev-dependencies", "build-dependencies")
@@ -187,6 +189,18 @@ def parse_release(text):
         raise SystemExit(f"RELEASE holds {text.strip()!r}, not major.minor.patch[-rc.N]")
     major, minor, patch, rc = m.groups()
     return int(major), int(minor), int(patch), (None if rc is None else int(rc))
+
+
+def insert_section(changelog, section):
+    """`changelog` with `section` placed above the newest released version.
+
+    A preamble (title, notes under their own `## ` headings) stays on top;
+    with no released version yet, the section goes at the end.
+    """
+    m = VERSION_HEADING.search(changelog)
+    if not m:
+        return f"{changelog.rstrip()}\n\n{section}"
+    return f"{changelog[: m.start()]}{section}{changelog[m.start() :]}"
 
 
 def unreleased_split(changelog):

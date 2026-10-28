@@ -28,7 +28,7 @@ import argparse
 import datetime
 import sys
 
-from release_lib import ROOT, git, parse_release, set_version, unreleased_split, workspace_version
+from release_lib import ROOT, git, insert_section, parse_release, set_version, unreleased_split, workspace_version
 
 
 def commits_since(tag):
@@ -92,12 +92,7 @@ def main():
             before, body, after = parts
             text = f"{before}## {target} ({today})\n{body.rstrip()}\n\n### Commits\n\n{entries}\n{after}"
         else:
-            head, sep, rest = text.partition("\n## ")
-            text = (
-                f"{head}\n## {target} ({today})\n\n{entries}{sep}{rest}"
-                if sep
-                else f"{text}\n## {target} ({today})\n\n{entries}"
-            )
+            text = insert_section(text, f"## {target} ({today})\n\n{entries}\n")
         changelog.write_text(text)
 
     release_file.write_text(f"{target}\n")
