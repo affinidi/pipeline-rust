@@ -163,9 +163,10 @@ jobs:
 of the repository opened by that app, since anyone can name a branch. Its
 `release-bot` input is the app's login, `affinidi-semantic-release[bot]` by
 default.
-`maintainer-cuts: "true"` also accepts a cut PR opened by a person with the
-admin or maintain role, for a repository that still cuts with a local script.
-It is transitional: cut with the `release-cut` workflow instead.
+`maintainer-releases: "true"` also accepts a cut or prep PR opened by a person
+with the admin or maintain role, for a repository that still cuts and preps
+with local scripts. It is transitional: use the `release-cut` and
+`release-prep` workflows instead.
 `release-tag` needs one that may create tags under your tag rules.
 
 ## Choosing the runner

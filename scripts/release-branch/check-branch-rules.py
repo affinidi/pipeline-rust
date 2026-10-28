@@ -26,13 +26,14 @@ or here. A backport, prep or cut PR counts as one only when the release
 tooling opened it, that is, from a branch of this repository by the release
 bot, not just any GitHub App.
 
-With MAINTAINER_CUTS=true, a cut PR also counts when a person with the admin
-or maintain role opened it from this repository: a repository that still cuts
-with a local script, until it moves to the release-cut workflow.
+With MAINTAINER_RELEASES=true, a cut or prep PR also counts when a person
+with the admin or maintain role opened it from this repository: a repository
+that still cuts and preps with local scripts, until it moves to the release
+workflows.
 
 Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
 HEAD_REPO (the PR head's repository), AUTHOR (the PR author's login),
-RELEASE_BOT (the release bot's login, `<app-slug>[bot]`), MAINTAINER_CUTS,
+RELEASE_BOT (the release bot's login, `<app-slug>[bot]`), MAINTAINER_RELEASES,
 and GITHUB_TOKEN with GITHUB_API_URL to read the author's role.
 """
 
@@ -97,7 +98,14 @@ def main():
     # A user login cannot contain "[", so a user account cannot pass as the bot.
     if not re.fullmatch(r"[A-Za-z0-9-]+\[bot\]", bot):
         sys.exit(f"release-bot {bot!r} is not a GitHub App login (<app-slug>[bot])")
-    tooling = os.environ["HEAD_REPO"] == os.environ["REPO"] and os.environ["AUTHOR"] == bot
+    same_repo = os.environ["HEAD_REPO"] == os.environ["REPO"]
+    tooling = same_repo and os.environ["AUTHOR"] == bot
+    manual = same_repo and os.environ.get("MAINTAINER_RELEASES") == "true"
+
+    def released_by(branch_matches):
+        # The role is read only for a cut or prep branch, so other PRs make no API call.
+        return branch_matches and (tooling or (manual and is_maintainer(os.environ["REPO"], os.environ["AUTHOR"])))
+
     changed = git("diff", "--name-only", "HEAD^1", "HEAD").split()
 
     # A base with no `[workspace.package] version` has no workspace version to
@@ -119,7 +127,7 @@ def main():
     if base.startswith("release/"):
         name = base.removeprefix("release/")
         backport = tooling and re.fullmatch(rf"backport-\d+-to-release/{re.escape(name)}", head)
-        prep = tooling and head.startswith(f"release-prep/{name}/")
+        prep = released_by(head.startswith(f"release-prep/{name}/"))
         if not (backport or prep or "release-direct" in labels):
             problems.append(
                 f"A change reaches {base} by backport, not directly. Open this PR against main "
@@ -134,15 +142,7 @@ def main():
                 "Revert: " + "; ".join(what)
             )
     elif base == "main":
-        cut = head.startswith("release-cut/") and (
-            tooling
-            or (
-                os.environ.get("MAINTAINER_CUTS") == "true"
-                and os.environ["HEAD_REPO"] == os.environ["REPO"]
-                and is_maintainer(os.environ["REPO"], os.environ["AUTHOR"])
-            )
-        )
-        if versions and not cut:
+        if versions and not released_by(head.startswith("release-cut/")):
             problems.append(
                 "A PR never edits the workspace version: main carries the next release's "
                 "version, set when a release is cut (RELEASES.md). Revert: " + "; ".join(versions)
