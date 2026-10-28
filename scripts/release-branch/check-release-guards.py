@@ -9,7 +9,8 @@ at the worst moment — mid-cut, or mid-publish:
 
   1. toolchain sync — rust-toolchain.toml's `channel` is the source of truth.
      Every `toolchain: "X"` in .github/workflows/* must equal it, the workspace
-     `rust-version` must not exceed it.
+     `rust-version` must not exceed it. A repository without the file has
+     nothing to sync, so the guard is skipped.
   2. lockstep — every member inherits `version.workspace = true`, and every
      internal dependency requires exactly the workspace version
      (`{ version = "0.42.0", path = ... }`); a path-only dev-dependency is exempt,
@@ -47,7 +48,8 @@ def toolchain_problems():
     problems = []
     tc = ROOT / "rust-toolchain.toml"
     if not tc.exists():
-        return ["rust-toolchain.toml is missing"]
+        print("toolchain: no rust-toolchain.toml, nothing to sync")
+        return []
     channel = tomllib.loads(tc.read_text())["toolchain"]["channel"]
     print(f"toolchain: rust-toolchain.toml channel = {channel}")
     pin = re.compile(r'^\s*toolchain:\s*"([^"]+)"', re.MULTILINE)
