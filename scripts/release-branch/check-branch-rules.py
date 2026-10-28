@@ -21,7 +21,12 @@ Into `main`:
 version yet (the repository's bootstrap) has nothing to protect, so the
 version rules don't apply to the PR that creates it.
 
-Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names).
+A branch name proves nothing on its own: anyone can name a branch, in a fork
+or here. A backport, prep or cut PR counts as one only when the release
+tooling opened it, that is, from a branch of this repository by a GitHub App.
+
+Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
+HEAD_REPO (the PR head's repository) and AUTHOR_TYPE (the PR author's type).
 """
 
 import json
@@ -61,6 +66,7 @@ def main():
     base = os.environ["BASE_REF"]
     head = os.environ["HEAD_REF"]
     labels = set(json.loads(os.environ.get("LABELS") or "[]"))
+    tooling = os.environ["HEAD_REPO"] == os.environ["REPO"] and os.environ["AUTHOR_TYPE"] == "Bot"
     changed = git("diff", "--name-only", "HEAD^1", "HEAD").split()
 
     # A base with no `[workspace.package] version` has no workspace version to
@@ -81,8 +87,8 @@ def main():
     problems = []
     if base.startswith("release/"):
         name = base.removeprefix("release/")
-        backport = re.fullmatch(rf"backport-\d+-to-release/{re.escape(name)}", head)
-        prep = head.startswith(f"release-prep/{name}/")
+        backport = tooling and re.fullmatch(rf"backport-\d+-to-release/{re.escape(name)}", head)
+        prep = tooling and head.startswith(f"release-prep/{name}/")
         if not (backport or prep or "release-direct" in labels):
             problems.append(
                 f"A change reaches {base} by backport, not directly. Open this PR against main "
@@ -97,7 +103,7 @@ def main():
                 "Revert: " + "; ".join(what)
             )
     elif base == "main":
-        if versions and not head.startswith("release-cut/"):
+        if versions and not (tooling and head.startswith("release-cut/")):
             problems.append(
                 "A PR never edits the workspace version: main carries the next release's "
                 "version, set when a release is cut (RELEASES.md). Revert: " + "; ".join(versions)

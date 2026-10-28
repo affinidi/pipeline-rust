@@ -26,6 +26,7 @@ entries that shipped in the release under its heading by hand, in the PR.
 
 import argparse
 import pathlib
+import re
 import sys
 import tempfile
 
@@ -49,6 +50,8 @@ def main():
     if not m:
         sys.exit(f"release name {args.name!r} is not major.minor")
     major, minor = map(int, m.groups())
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._/-]*", args.source):
+        sys.exit(f"--from {args.source!r} is not a revision name")
     branch = f"release/{args.name}"
     version = f"{args.name}.0"
     next_version = f"{major}.{minor + 1}.0"

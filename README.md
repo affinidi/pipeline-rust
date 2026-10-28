@@ -157,8 +157,10 @@ jobs:
       - uses: affinidi/pipeline-rust/.github/actions/release-publish@<commit>
 ```
 
-`release-cut`, `release-prep` and `release-backport` need a `token` that is
-not `GITHUB_TOKEN`: what `GITHUB_TOKEN` pushes or opens triggers no workflow.
+`release-cut`, `release-prep` and `release-backport` need a GitHub App
+`token`: what `GITHUB_TOKEN` pushes or opens triggers no workflow, and
+`release-branch-rules` accepts a cut, prep or backport PR only from a branch
+of the repository opened by an app, since anyone can name a branch.
 `release-tag` needs one that may create tags under your tag rules.
 
 ## Choosing the runner

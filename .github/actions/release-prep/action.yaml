@@ -5,7 +5,8 @@
 #
 # token opens the PR. A PR opened with GITHUB_TOKEN runs no CI, and an
 # organisation may not let GITHUB_TOKEN open PRs at all, so pass a GitHub App
-# or fine-grained token with contents and pull-requests write.
+# token with contents and pull-requests write: release-branch-rules accepts a
+# prep PR only when an app opened it.
 name: Prepare a release
 description: Open the PR that prepares the next rc, GA or patch of a release branch.
 
@@ -31,7 +32,7 @@ runs:
       run: |
         set -euo pipefail
         if [ "${HAS_TOKEN}" != "true" ]; then
-          echo "::error::token is empty: pass a GitHub App or fine-grained token (see the action's header)"
+          echo "::error::token is empty: pass a GitHub App token (see the action's header)"
           exit 1
         fi
     - name: Check the ref is a release branch

@@ -19,4 +19,7 @@ runs:
         BASE_REF: ${{ github.base_ref }}
         HEAD_REF: ${{ github.head_ref }}
         LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        REPO: ${{ github.repository }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        AUTHOR_TYPE: ${{ github.event.pull_request.user.type }}
       run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-branch-rules.py"

@@ -109,6 +109,8 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("--base-sha", help="the PR's base commit, to check RELEASE only moves forward")
     args = ap.parse_args()
+    if args.base_sha and not re.fullmatch(r"[0-9a-f]{40}", args.base_sha):
+        sys.exit(f"--base-sha {args.base_sha!r} is not a full commit SHA")
 
     sections = [
         ("toolchain sync", toolchain_problems()),

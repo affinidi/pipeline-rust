@@ -4,7 +4,8 @@
 # closed and labeled; it checks out no PR code to run.
 #
 # token opens the PR. One opened with GITHUB_TOKEN runs no CI, so pass a
-# GitHub App or fine-grained token with contents and pull-requests write.
+# GitHub App token with contents and pull-requests write: release-branch-rules
+# accepts a backport PR only when an app opened it.
 name: Backport
 description: Open a backport PR for each `backport release/<major.minor>` label on a merged PR.
 
@@ -23,7 +24,7 @@ runs:
       run: |
         set -euo pipefail
         if [ "${HAS_TOKEN}" != "true" ]; then
-          echo "::error::token is empty: pass a GitHub App or fine-grained token (see the action's header)"
+          echo "::error::token is empty: pass a GitHub App token (see the action's header)"
           exit 1
         fi
     - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -34,10 +35,7 @@ runs:
         github_token: ${{ inputs.token }}
         label_pattern: '^backport (release/\d+\.\d+)$'
         pull_title: '${pull_title}'
-        pull_description: |-
-          Backport of #${pull_number} to `${target_branch}`.
-
-          ${pull_description}
+        pull_description: 'Backport of #${pull_number} to `${target_branch}`.'
         add_labels: backport
         copy_assignees: true
         experimental: '{"conflict_resolution": "draft_commit_conflicts"}'
