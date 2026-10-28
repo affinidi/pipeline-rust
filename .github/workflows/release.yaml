@@ -287,9 +287,11 @@ jobs:
             [ -n "$token" ] || return 1
             echo "::add-mask::$token"
           }
+          # A token left live fails the job at the end, after the other crates publish.
+          unrevoked=()
           revoke_token() {
             curl -fsS -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
-              || echo "::warning::could not revoke the trusted publishing token for $2; it expires within 30 minutes"
+              || unrevoked+=("$2")
           }
 
           # Verify-build first with no token, then upload on a fresh one.
@@ -376,10 +378,16 @@ jobs:
 
           echo "=== Publish summary ==="
           echo "Published (${#published[@]}): ${published[*]:-none}"
+          failed=0
+          if [ "${#unrevoked[@]}" -gt 0 ]; then
+            echo "::error::could not revoke the trusted publishing token for: ${unrevoked[*]}; each expires within 30 minutes of minting"
+            failed=1
+          fi
           if [ "${#pending[@]}" -gt 0 ]; then
             echo "::error::failed to publish after ${retries} attempt(s): ${pending[*]}"
-            exit 1
+            failed=1
           fi
+          exit "$failed"
 
       # always(): a partial failure (e.g. one crate blocked on an external dep)
       # still publishes the others irreversibly, so their tags must be pushed
