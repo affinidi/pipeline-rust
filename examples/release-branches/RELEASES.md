@@ -39,7 +39,8 @@ check fails a tree where the versions disagree. On a release branch, the
 Only an admin or maintainer may cut. The cut also opens a PR that moves `main`
 to the next minor and starts a new `## Unreleased` section in `CHANGELOG.md`;
 merge it. Merging a prep PR is the release: it is tagged, and a GA or patch is
-published to crates.io.
+published to crates.io. Step by step:
+[How to release](https://github.com/affinidi/pipeline-rust/blob/main/docs/how-to-release.md).
 
 ## Schedule
 

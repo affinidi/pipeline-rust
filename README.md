@@ -176,6 +176,8 @@ The repository needs:
 
 Before `nightly` exists, cut from `origin/main`.
 
+To cut, prepare and backport, see [How to release](docs/how-to-release.md).
+
 ## Choosing the runner
 
 `checks.yaml`, `checks-no-test.yaml` and `checks-test-only.yaml` take an
