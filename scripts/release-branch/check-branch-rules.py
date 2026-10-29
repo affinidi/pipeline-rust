@@ -43,9 +43,8 @@ import re
 import subprocess
 import sys
 import tomllib
-import urllib.error
-import urllib.parse
-import urllib.request
+
+from release_lib import is_maintainer
 
 
 def git(*args):
@@ -71,23 +70,6 @@ def version_of(data, path):
     if isinstance(v, dict):
         return "workspace" if v.get("workspace") else None
     return v
-
-
-def is_maintainer(repo, login):
-    """True if `login` holds the admin or maintain role on `repo`; a non-collaborator is not."""
-    api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-    url = f"{api}/repos/{repo}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
-    req = urllib.request.Request(
-        url,
-        headers={"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}", "Accept": "application/vnd.github+json"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp).get("role_name") in ("admin", "maintain")
-    except urllib.error.HTTPError as e:
-        if e.code == 404:
-            return False
-        sys.exit(f"could not read {login}'s role on {repo}: HTTP {e.code}")
 
 
 def main():

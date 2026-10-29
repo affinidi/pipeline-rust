@@ -13,11 +13,15 @@ rc never changes the crates' version (they are already `0.42.0`); only GA and
 patches publish.
 """
 
+import json
 import os
 import pathlib
 import re
 import subprocess
 import tomllib
+import urllib.error
+import urllib.parse
+import urllib.request
 
 # The repository being released: the scripts live in pipeline-rust, and every
 # action runs them from the root of the caller's checkout.
@@ -181,6 +185,23 @@ def set_version(root, version):
     if problems:
         raise SystemExit("set_version left the lockstep invariant broken:\n  " + "\n  ".join(problems))
     run("cargo", "update", "-w", cwd=root)
+
+
+def is_maintainer(repo, login):
+    """True if `login` holds the admin or maintain role on `repo`; a non-collaborator is not."""
+    api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
+    url = f"{api}/repos/{repo}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
+    req = urllib.request.Request(
+        url,
+        headers={"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}", "Accept": "application/vnd.github+json"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.load(resp).get("role_name") in ("admin", "maintain")
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            return False
+        raise SystemExit(f"could not read {login}'s role on {repo}: HTTP {e.code}")
 
 
 def parse_release(text):
