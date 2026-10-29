@@ -1,0 +1,30 @@
+name: Backport
+
+# A merged PR labelled `backport release/<major.minor>` is cherry-picked onto
+# that branch as a new PR. Checks out no PR code to run.
+
+on:
+  pull_request_target:
+    types: [closed, labeled]
+
+permissions:
+  contents: read
+
+jobs:
+  backport:
+    name: Backport
+    if: >-
+      github.event.pull_request.merged == true &&
+      (github.event.action == 'closed' || startsWith(github.event.label.name, 'backport '))
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 15
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+      - uses: affinidi/pipeline-rust/.github/actions/release-backport@<commit>
+        with:
+          token: ${{ steps.app.outputs.token }}

@@ -1,0 +1,26 @@
+name: Nightly
+
+# Moves `nightly` to the newest main commit on which every ci.yml job passed.
+
+on:
+  schedule:
+    - cron: "0 2 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: nightly
+  cancel-in-progress: false
+
+jobs:
+  advance:
+    name: Advance nightly to the last green main
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: affinidi/pipeline-rust/.github/actions/release-nightly@<commit>

@@ -135,27 +135,7 @@ repository. They need Python 3.11 or later on the runner.
 each crate, then mints a token for that crate alone, uploads and revokes it,
 so a long release never outlives a 30-minute token. Because the action runs
 inside your workflow, the trusted publisher on crates.io names your
-repository, your workflow file and its environment:
-
-```yaml
-name: Publish crates   # .github/workflows/publish.yml: the trusted publisher names this file
-
-on:
-  push:
-    branches: ["release/**"]
-  workflow_dispatch:
-
-jobs:
-  publish:
-    if: startsWith(github.ref, 'refs/heads/release/')
-    runs-on: ubuntu-24.04
-    environment: release
-    permissions:
-      id-token: write
-      contents: read
-    steps:
-      - uses: affinidi/pipeline-rust/.github/actions/release-publish@<commit>
-```
+repository, your workflow file and its environment.
 
 `release-cut`, `release-prep` and `release-backport` need a GitHub App
 `token`: what `GITHUB_TOKEN` pushes or opens triggers no workflow, and
@@ -170,6 +150,54 @@ with local scripts. It is transitional: use the `release-cut` and
 `release-cut` also refuses unless whoever started the run has the admin or
 maintain role, so not everyone who may run a workflow can cut.
 `release-tag` needs one that may create tags under your tag rules.
+
+### Adopting release branches
+
+Copy the workflows in [`examples/release-branches`](examples/release-branches)
+to `.github/workflows/` and replace every `@<commit>` with one pipeline-rust
+commit:
+
+| Workflow | Runs | Action |
+|---|---|---|
+| `ci.yml` | on every PR and push to `main` and `release/**` | `release-guards`, next to your build and test jobs |
+| `branch-rules.yml` | on every PR into `main` and `release/**`, and when its labels change | `release-branch-rules` |
+| `dco.yml` | on every PR into `main` and `release/**` | `release-dco` |
+| `nightly.yml` | daily | `release-nightly` |
+| `release-cut.yml` | by hand, on `main` | `release-cut` |
+| `release-prep.yml` | by hand, on `release/<major.minor>` | `release-prep` |
+| `release-tag.yml` | on a push to `release/**` that changes `RELEASE` | `release-tag` |
+| `publish.yml` | on every push to `release/**` | `release-publish` |
+| `backport.yml` | when a merged PR has a `backport release/<major.minor>` label | `release-backport` |
+
+The workspace needs:
+
+- one version for every crate: `[workspace.package] version`, inherited with
+  `version.workspace = true`, and every internal dependency requiring exactly
+  it (`{ version = "0.4.0", path = "…" }`);
+- `CHANGELOG.md` at the root, with an `## Unreleased` section on `main`;
+- if there is a `rust-toolchain.toml`, every `toolchain:` in the workflows set
+  to its channel;
+- `RELEASES.md`, which the checks' messages point to. Start from
+  [`examples/release-branches/RELEASES.md`](examples/release-branches/RELEASES.md).
+
+The repository needs:
+
+- the release bot app installed, with its app ID in the `RELEASE_BOT_APP_ID`
+  secret and its private key in `RELEASE_BOT_PRIVATE_KEY`;
+- an environment `release` holding `RELEASE_BOT_PRIVATE_KEY`, whose
+  deployment branches allow `main` (cut, backport) and `release/*` (prep, tag,
+  publish);
+- a tag ruleset that lets the release bot create tags;
+- a `release/*` ruleset that requires a PR and the `branch rules`,
+  `release guards` and `DCO sign-off` checks, blocks force pushes and
+  deletion, and lets only the release bot and admins create the branch;
+- a `nightly` ruleset that blocks force pushes and deletion;
+- for each crate, a trusted publisher on crates.io naming the repository,
+  `publish.yml` and the `release` environment. A new crate's first version is
+  published by hand.
+
+The first cut comes before `nightly` exists: run *Cut a release* with `from`
+set to `origin/main`, as a dry run first.
 
 ## Choosing the runner
 
