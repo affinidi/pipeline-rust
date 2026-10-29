@@ -137,12 +137,11 @@ so a long release never outlives a 30-minute token. Because the action runs
 inside your workflow, the trusted publisher on crates.io names your
 repository, your workflow file and its environment.
 
-`release-cut`, `release-prep` and `release-backport` need a GitHub App
-`token`: what `GITHUB_TOKEN` pushes or opens triggers no workflow, and
-`release-branch-rules` accepts a cut, prep or backport PR only from a branch
-of the repository opened by that app, since anyone can name a branch. Its
-`release-bot` input is the app's login, `affinidi-semantic-release[bot]` by
-default.
+`release-cut`, `release-prep` and `release-backport` need a `token` from
+Affinidi's release bot app, `affinidi-semantic-release`: what `GITHUB_TOKEN`
+pushes or opens triggers no workflow, and `release-branch-rules` accepts a
+cut, prep or backport PR only from a branch of the repository opened by that
+app, since anyone can name a branch.
 `maintainer-releases: "true"` also accepts a cut or prep PR opened by a person
 with the admin or maintain role, for a repository that still cuts and preps
 with local scripts. It is transitional: use the `release-cut` and

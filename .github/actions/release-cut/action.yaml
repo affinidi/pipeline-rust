@@ -6,7 +6,7 @@
 # token pushes the branch and opens the PR. It must not be GITHUB_TOKEN: a
 # branch GITHUB_TOKEN pushes triggers no workflow, so the rc.0 would never be
 # tagged. Pass a GitHub App token with contents and pull-requests write:
-# release-branch-rules accepts a cut PR only when an app opened it.
+# release-branch-rules accepts a cut PR only when the release bot opened it.
 #
 # Only a person with the admin or maintain role may start the cut: the action
 # reads the role of whoever started the run.

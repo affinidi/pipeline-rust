@@ -24,7 +24,8 @@ version rules don't apply to the PR that creates it.
 A branch name proves nothing on its own: anyone can name a branch, in a fork
 or here. A backport, prep or cut PR counts as one only when the release
 tooling opened it, that is, from a branch of this repository by the release
-bot, not just any GitHub App.
+bot, not just any GitHub App. The bot is known by its account ID, which, unlike
+a login, is never reused.
 
 With MAINTAINER_RELEASES=true, a cut or prep PR also counts when a person
 with the admin or maintain role opened it from this repository: a repository
@@ -32,8 +33,8 @@ that still cuts and preps with local scripts, until it moves to the release
 workflows.
 
 Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
-HEAD_REPO (the PR head's repository), AUTHOR (the PR author's login),
-RELEASE_BOT (the release bot's login, `<app-slug>[bot]`), MAINTAINER_RELEASES,
+HEAD_REPO (the PR head's repository), AUTHOR and AUTHOR_ID (the PR author's
+login and account ID), MAINTAINER_RELEASES,
 and GITHUB_TOKEN with GITHUB_API_URL to read the author's role.
 """
 
@@ -45,6 +46,9 @@ import sys
 import tomllib
 
 from release_lib import is_maintainer
+
+# affinidi-semantic-release[bot], the account the release bot app acts as.
+RELEASE_BOT_ID = 169678785
 
 
 def git(*args):
@@ -76,12 +80,8 @@ def main():
     base = os.environ["BASE_REF"]
     head = os.environ["HEAD_REF"]
     labels = set(json.loads(os.environ.get("LABELS") or "[]"))
-    bot = os.environ["RELEASE_BOT"]
-    # A user login cannot contain "[", so a user account cannot pass as the bot.
-    if not re.fullmatch(r"[A-Za-z0-9-]+\[bot\]", bot):
-        sys.exit(f"release-bot {bot!r} is not a GitHub App login (<app-slug>[bot])")
     same_repo = os.environ["HEAD_REPO"] == os.environ["REPO"]
-    tooling = same_repo and os.environ["AUTHOR"] == bot
+    tooling = same_repo and os.environ["AUTHOR_ID"] == str(RELEASE_BOT_ID)
     manual = same_repo and os.environ.get("MAINTAINER_RELEASES") == "true"
 
     def released_by(branch_matches):

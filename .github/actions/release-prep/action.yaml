@@ -6,7 +6,7 @@
 # token opens the PR. A PR opened with GITHUB_TOKEN runs no CI, and an
 # organisation may not let GITHUB_TOKEN open PRs at all, so pass a GitHub App
 # token with contents and pull-requests write: release-branch-rules accepts a
-# prep PR only when an app opened it.
+# prep PR only when the release bot opened it.
 name: Prepare a release
 description: Open the PR that prepares the next rc, GA or patch of a release branch.
 

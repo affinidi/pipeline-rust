@@ -5,7 +5,7 @@
 #
 # token opens the PR. One opened with GITHUB_TOKEN runs no CI, so pass a
 # GitHub App token with contents and pull-requests write: release-branch-rules
-# accepts a backport PR only when an app opened it.
+# accepts a backport PR only when the release bot opened it.
 name: Backport
 description: Open a backport PR for each `backport release/<major.minor>` label on a merged PR.
 
