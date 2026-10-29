@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Cut a release: create `release/<major.minor>` and move main to the next one.
 
-    cut-release.py 0.42 [--from origin/nightly] [--dry-run]
+    cut-release.py 0.42 [--from origin/nightly] [--actor LOGIN] [--dry-run]
 
 Run by the release-cut action from the root of the repository, with push
-access and `gh` authenticated. It:
+access and `gh` authenticated. With --actor (the action passes whoever started
+the run), it refuses unless that login holds the admin or maintain role on
+GITHUB_REPOSITORY, read with GITHUB_TOKEN. It:
 
   1. resolves the source commit — `origin/nightly` by default, the newest main
      commit the full CI suite passed (RELEASES.md);
@@ -25,12 +27,13 @@ entries that shipped in the release under its heading by hand, in the PR.
 """
 
 import argparse
+import os
 import pathlib
 import re
 import sys
 import tempfile
 
-from release_lib import RELEASE_NAME, git, run, set_version, unreleased_split
+from release_lib import RELEASE_NAME, git, is_maintainer, run, set_version, unreleased_split
 
 
 def worktree(rev, tmp, name):
@@ -43,8 +46,14 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     ap.add_argument("name", help="major.minor, e.g. 0.42")
     ap.add_argument("--from", dest="source", default="origin/nightly")
+    ap.add_argument("--actor", help="refuse unless this login is an admin or maintainer of the repository")
     ap.add_argument("--dry-run", action="store_true", help="build both commits, push nothing")
     args = ap.parse_args()
+
+    if args.actor is not None:
+        repo = os.environ["GITHUB_REPOSITORY"]
+        if not is_maintainer(repo, args.actor):
+            sys.exit(f"{args.actor} may not cut a release: it takes the admin or maintain role on {repo}")
 
     m = RELEASE_NAME.fullmatch(args.name)
     if not m:

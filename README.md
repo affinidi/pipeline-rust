@@ -167,6 +167,8 @@ default.
 with the admin or maintain role, for a repository that still cuts and preps
 with local scripts. It is transitional: use the `release-cut` and
 `release-prep` workflows instead.
+`release-cut` also refuses unless whoever started the run has the admin or
+maintain role, so not everyone who may run a workflow can cut.
 `release-tag` needs one that may create tags under your tag rules.
 
 ## Choosing the runner
