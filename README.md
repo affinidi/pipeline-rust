@@ -169,7 +169,9 @@ The repository needs:
   `release/*`;
 - rulesets that let the app create tags and release branches, and protect
   `release/*` (PR with approval of the most recent push, the `branch rules`,
-  `release guards` and `DCO sign-off` checks, no force push or deletion) and `nightly` (no force push or deletion);
+  `release guards` and `DCO sign-off` checks, no force push or deletion) and
+  `nightly` (only the app, maintainers and admins create or update it; no
+  force push or deletion);
 - for each crate, a crates.io trusted publisher naming the repository,
   `publish.yml` and `release`. A new crate's first version is published by
   hand.

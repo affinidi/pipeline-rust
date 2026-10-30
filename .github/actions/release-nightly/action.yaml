@@ -2,6 +2,9 @@
 # job of the CI workflow passed, so a release is cut from a fully green commit
 # rather than main's tip. Jobs are read from each run's latest attempt rather
 # than the run's conclusion. Never moves nightly anywhere but forward.
+#
+# token moves nightly. Where a ruleset lets only the release bot update
+# nightly, pass a GitHub App token with contents write and actions read.
 name: Advance nightly
 description: Fast-forward nightly to the newest fully green main commit.
 
