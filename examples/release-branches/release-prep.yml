@@ -22,6 +22,7 @@ concurrency:
 jobs:
   prepare:
     name: Prepare ${{ inputs.kind }} on ${{ github.ref_name }}
+    if: startsWith(github.ref, 'refs/heads/release/')
     runs-on: ubuntu-24.04
     environment: release
     timeout-minutes: 30

@@ -1,7 +1,7 @@
 # Cuts release/<major.minor>: pushes the branch at <major.minor>.0 with RELEASE
 # = <major.minor>.0-rc.0, opens the release-cut/<major.minor> PR that moves main
 # to the next minor, and creates the `backport release/<major.minor>` label.
-# Run it from a workflow_dispatch workflow on main.
+# Run it from a workflow_dispatch workflow on main; on any other ref it refuses.
 #
 # token pushes the branch and opens the PR. It must not be GITHUB_TOKEN: a
 # branch GITHUB_TOKEN pushes triggers no workflow, so the rc.0 would never be

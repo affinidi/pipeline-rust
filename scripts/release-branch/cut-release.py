@@ -6,7 +6,8 @@
 Run by the release-cut action from the root of the repository, with push
 access and `gh` authenticated. With --actor (the action passes whoever started
 the run), it refuses unless that login holds the admin or maintain role on
-GITHUB_REPOSITORY, read with GITHUB_TOKEN. It:
+GITHUB_REPOSITORY, read with GITHUB_TOKEN. In GitHub Actions it refuses a run
+on any ref but main, whose workflow file is the reviewed one. It:
 
   1. resolves the source commit — `origin/nightly` by default, the newest main
      commit the full CI suite passed (RELEASES.md) — and refuses one main
@@ -51,6 +52,9 @@ def main():
     ap.add_argument("--dry-run", action="store_true", help="build both commits, push nothing")
     args = ap.parse_args()
 
+    ref = os.environ.get("GITHUB_REF")
+    if os.environ.get("GITHUB_ACTIONS") == "true" and ref != "refs/heads/main":
+        sys.exit(f"run the cut from main, not {ref}")
     if args.actor is not None:
         repo = os.environ["GITHUB_REPOSITORY"]
         if not is_maintainer(repo, args.actor):

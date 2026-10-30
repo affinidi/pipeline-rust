@@ -36,6 +36,7 @@ The cut refuses:
 
 | Message | Meaning |
 |---|---|
+| `run the cut from main, not <ref>` | Start **Cut a release** with `main` as the branch. |
 | `<login> may not cut a release` | Whoever started the run needs the admin or maintain role. |
 | `<rev> (<sha>) is not on main` | Cut from a commit `main` has, normally `origin/nightly`. |
 | `release/0.4 already exists` | That release is cut already. Prepare its next version instead. |
