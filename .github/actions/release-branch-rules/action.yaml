@@ -1,8 +1,10 @@
 # Where a PR may go and what it may change: a fix reaches release/<major.minor>
 # by backport (or with the release-direct label), and only the release tooling
 # moves versions or RELEASE. Call it on pull_request into main and release/**,
-# with types opened, synchronize, reopened, labeled and unlabeled. Cut, prep and
-# backport PRs count only when Affinidi's release bot opened them.
+# with types opened, synchronize, reopened, labeled and unlabeled, and
+# permissions contents: read and pull-requests: read. Cut, prep and backport PRs
+# count only when Affinidi's release bot opened them, and release-direct only
+# when a maintainer added it.
 name: Release branch rules
 description: Check a PR against the release-branch rules.
 
@@ -28,6 +30,7 @@ runs:
         HEAD_REF: ${{ github.head_ref }}
         LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
         REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
         HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
         AUTHOR: ${{ github.event.pull_request.user.login }}
         AUTHOR_ID: ${{ github.event.pull_request.user.id }}

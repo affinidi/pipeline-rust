@@ -80,7 +80,8 @@ The prep refuses:
 
 Only when the code no longer exists on `main` does a fix go straight into
 `release/0.4`: a maintainer labels that PR `release-direct`, and its
-description says why.
+description says why. A label anyone else added fails `branch rules`; a
+maintainer removes it and adds it again.
 
 ## Without the release bot
 

@@ -187,21 +187,44 @@ def set_version(root, version):
     run("cargo", "update", "-w", cwd=root)
 
 
-def is_maintainer(repo, login):
-    """True if `login` holds the admin or maintain role on `repo`; a non-collaborator is not."""
+def github_get(path):
+    """GET `path` from the GitHub API with GITHUB_TOKEN; raises HTTPError."""
     api = os.environ.get("GITHUB_API_URL", "https://api.github.com")
-    url = f"{api}/repos/{repo}/collaborators/{urllib.parse.quote(login, safe='')}/permission"
     req = urllib.request.Request(
-        url,
+        f"{api}/{path}",
         headers={"Authorization": f"Bearer {os.environ['GITHUB_TOKEN']}", "Accept": "application/vnd.github+json"},
     )
+    with urllib.request.urlopen(req, timeout=30) as resp:
+        return json.load(resp)
+
+
+def is_maintainer(repo, login):
+    """True if `login` holds the admin or maintain role on `repo`; a non-collaborator is not."""
     try:
-        with urllib.request.urlopen(req, timeout=30) as resp:
-            return json.load(resp).get("role_name") in ("admin", "maintain")
+        perm = github_get(f"repos/{repo}/collaborators/{urllib.parse.quote(login, safe='')}/permission")
     except urllib.error.HTTPError as e:
         if e.code == 404:
             return False
         raise SystemExit(f"could not read {login}'s role on {repo}: HTTP {e.code}")
+    return perm.get("role_name") in ("admin", "maintain")
+
+
+def last_labeler(repo, number, label):
+    """Login of whoever last added `label` to issue or PR `number`; None if no one did."""
+    added = []
+    page = 1
+    while True:
+        try:
+            events = github_get(f"repos/{repo}/issues/{number}/events?per_page=100&page={page}")
+        except urllib.error.HTTPError as e:
+            raise SystemExit(f"could not read the label history of #{number} on {repo}: HTTP {e.code}")
+        added += [ev for ev in events if ev.get("event") == "labeled" and (ev.get("label") or {}).get("name") == label]
+        if len(events) < 100:
+            break
+        page += 1
+    if not added:
+        return None
+    return (max(added, key=lambda ev: ev["created_at"]).get("actor") or {}).get("login")
 
 
 def parse_release(text):

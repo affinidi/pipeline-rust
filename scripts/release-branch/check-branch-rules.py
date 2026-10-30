@@ -8,6 +8,8 @@ Into `release/<major.minor>`:
   1. Only a bot backport (`backport-<pr>-to-release/<name>`, opened by
      backport.yml), a prep PR (`release-prep/<name>/<version>`), or a PR
      labelled `release-direct` by a maintainer. A fix lands on main first.
+     Anyone with triage access can label, so the label counts only when the
+     person who last added it holds the admin or maintain role.
   2. Only a prep PR changes the workspace version or `RELEASE`.
 
 Into `main`:
@@ -33,9 +35,9 @@ that still cuts and preps with local scripts, until it moves to the release
 workflows.
 
 Environment: BASE_REF, HEAD_REF, LABELS (JSON list of label names), REPO,
-HEAD_REPO (the PR head's repository), AUTHOR and AUTHOR_ID (the PR author's
-login and account ID), MAINTAINER_RELEASES,
-and GITHUB_TOKEN with GITHUB_API_URL to read the author's role.
+PR_NUMBER, HEAD_REPO (the PR head's repository), AUTHOR and AUTHOR_ID (the PR
+author's login and account ID), MAINTAINER_RELEASES, and GITHUB_TOKEN with
+GITHUB_API_URL to read roles and the label history (pull-requests: read).
 """
 
 import json
@@ -45,7 +47,7 @@ import subprocess
 import sys
 import tomllib
 
-from release_lib import is_maintainer
+from release_lib import is_maintainer, last_labeler
 
 # affinidi-semantic-release[bot], the account the release bot app acts as.
 RELEASE_BOT_ID = 169678785
@@ -88,6 +90,13 @@ def main():
         # The role is read only for a cut or prep branch, so other PRs make no API call.
         return branch_matches and (tooling or (manual and is_maintainer(os.environ["REPO"], os.environ["AUTHOR"])))
 
+    def direct_by():
+        # Who last added release-direct, and whether they may; read only when the label is there.
+        if "release-direct" not in labels:
+            return None, False
+        who = last_labeler(os.environ["REPO"], os.environ["PR_NUMBER"], "release-direct")
+        return who, who is not None and is_maintainer(os.environ["REPO"], who)
+
     changed = git("diff", "--name-only", "HEAD^1", "HEAD").split()
 
     # A base with no `[workspace.package] version` has no workspace version to
@@ -110,7 +119,13 @@ def main():
         name = base.removeprefix("release/")
         backport = tooling and re.fullmatch(rf"backport-\d+-to-release/{re.escape(name)}", head)
         prep = released_by(head.startswith(f"release-prep/{name}/"))
-        if not (backport or prep or "release-direct" in labels):
+        labeler, direct = (None, False) if backport or prep else direct_by()
+        if labeler and not direct:
+            problems.append(
+                f"{labeler} added the `release-direct` label, but only a maintainer's counts. "
+                f"A maintainer removes it and adds it again."
+            )
+        elif not (backport or prep or direct):
             problems.append(
                 f"A change reaches {base} by backport, not directly. Open this PR against main "
                 f"instead; once it merges, label it `backport {base}` and backport.yml opens the "
