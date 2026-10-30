@@ -29,6 +29,10 @@ tooling opened it, that is, from a branch of this repository by the release
 bot, not just any GitHub App. The bot is known by its account ID, which, unlike
 a login, is never reused.
 
+Who opened a PR is not who pushed to it last: anyone with write access can
+push to the bot's branch. The ruleset on `release/*` must require approval of
+the most recent push, so such a push still needs someone else's review.
+
 With MAINTAINER_RELEASES=true, a cut or prep PR also counts when a person
 with the admin or maintain role opened it from this repository: a repository
 that still cuts and preps with local scripts, until it moves to the release
