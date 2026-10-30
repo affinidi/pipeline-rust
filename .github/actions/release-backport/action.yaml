@@ -13,6 +13,11 @@ inputs:
   token:
     description: "Token that pushes the backport branch and opens the PR."
     required: true
+  pull-description:
+    # korthout/backport-action placeholders apply, ${pull_description} among them.
+    description: "Body of the backport PR."
+    required: false
+    default: 'Backport of #${pull_number} to `${target_branch}`.'
 
 runs:
   using: composite
@@ -35,7 +40,7 @@ runs:
         github_token: ${{ inputs.token }}
         label_pattern: '^backport (release/\d+\.\d+)$'
         pull_title: '${pull_title}'
-        pull_description: 'Backport of #${pull_number} to `${target_branch}`.'
+        pull_description: ${{ inputs.pull-description }}
         add_labels: backport
         copy_assignees: true
         experimental: '{"conflict_resolution": "draft_commit_conflicts"}'
