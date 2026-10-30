@@ -1,0 +1,21 @@
+name: Branch rules
+
+# Its own workflow, so labelling a PR re-runs it without rebuilding anything.
+
+on:
+  pull_request:
+    branches: [main, "release/**"]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read  # who added release-direct
+
+jobs:
+  rules:
+    # The job name is the required status check.
+    name: branch rules
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: affinidi/pipeline-rust/.github/actions/release-branch-rules@<commit>

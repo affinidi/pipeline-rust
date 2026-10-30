@@ -1,0 +1,23 @@
+name: CI
+
+# nightly.yml advances `nightly` only to a main commit on which every job here
+# passed, so a check that should gate a cut belongs in this file: add your
+# build, test and publish dry-run jobs next to `guards`.
+
+on:
+  push:
+    branches: [main, "release/**"]
+  pull_request:
+    branches: [main, "release/**"]
+
+permissions:
+  contents: read
+
+jobs:
+  guards:
+    # The job name is the required status check.
+    name: release guards
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: affinidi/pipeline-rust/.github/actions/release-guards@<commit>

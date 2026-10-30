@@ -1,0 +1,12 @@
+extends: default
+
+rules:
+  # GitHub YAML has no `---`, and `on:` is a key, not a boolean.
+  document-start: disable
+  truthy:
+    check-keys: false
+  # Long lines are shell commands and descriptions; wrapping them adds nothing.
+  line-length: disable
+  # `uses: owner/action@<sha> # vX.Y.Z`
+  comments:
+    min-spaces-from-content: 1

@@ -51,12 +51,33 @@ on:
       CARGO_REGISTRY_TOKEN:
         description: crates.io access token
         required: false
+      SNYK_SCANNER_TOKEN:
+        description: Snyk token for the security scan
+        required: false
+      SNYK_SCANNER_REGION:
+        description: Snyk region for the security scan
+        required: false
+      SNYK_GLOBAL_POLICY:
+        description: Snyk policy for the security scan
+        required: false
+      RELEASE_BOT_APP_ID:
+        description: GitHub App ID of the release bot that pushes tags
+        required: false
+      RELEASE_BOT_PRIVATE_KEY:
+        description: private key of that GitHub App
+        required: false
 jobs:
   rust-scan:
-    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@main
+    uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@3aeeb2ceac5c60e12ebddf3ae7bdf9cae56c78b5 # main, 2026-09-25
+    # The scanner only reads the code: pass it its own secrets, not every one.
+    permissions:
+      contents: read
     with:
       repo-path: ${{ inputs.repo-path }}
-    secrets: inherit
+    secrets:
+      SNYK_SCANNER_TOKEN: ${{ secrets.SNYK_SCANNER_TOKEN }}
+      SNYK_SCANNER_REGION: ${{ secrets.SNYK_SCANNER_REGION }}
+      SNYK_GLOBAL_POLICY: ${{ secrets.SNYK_GLOBAL_POLICY }}
 
   release:
     needs: [rust-scan]
@@ -72,7 +93,7 @@ jobs:
       #     tools-cache: true
 
       # https://github.com/actions/create-github-app-token
-      - uses: actions/create-github-app-token@v2
+      - uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2.2.2
         id: app-token
         with:
           owner: ${{ github.repository_owner }}
@@ -81,7 +102,7 @@ jobs:
           app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
           private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           token: ${{ steps.app-token.outputs.token }}
           fetch-depth: 0
@@ -93,7 +114,7 @@ jobs:
           git config user.name "${GITHUB_ACTOR}"
           git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
 
-      - uses: actions-rust-lang/setup-rust-toolchain@v1
+      - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
         with:
           toolchain: ${{ inputs.toolchain }}
           rustflags: ${{ inputs.rustflags }}
@@ -118,9 +139,11 @@ jobs:
       # workflow (verifyPublish: true); at release time each crate is verified
       # in isolation by its own `cargo publish -p` below.
 
+      # Workspace path only: the per-crate path mints its own token per crate.
       - name: Authenticate to crates.io (OIDC trusted publishing)
         id: auth
-        uses: rust-lang/crates-io-auth-action@v1
+        if: ${{ inputs.workspace_publish }}
+        uses: rust-lang/crates-io-auth-action@c6f97d42243bad5fab37ca0427f495c86d5b1a18 # v1.0.5
         continue-on-error: true  # falls back to CARGO_REGISTRY_TOKEN secret if trusted publisher not configured
 
       # - name: Release
@@ -228,11 +251,14 @@ jobs:
       #     pass that makes no progress stops early and reports real failures.
       #   * Off `main` (or when release_dry_run) everything runs as `--dry-run`,
       #     so this is fully exercisable from a PR / test branch.
+      #   * A trusted publishing token expires 30 minutes after it is minted,
+      #     and one token for the whole run lost every crate published after
+      #     that. Each crate is verify-built with no token, then uploaded on a
+      #     token minted for it alone and revoked straight after.
+      #   * Trusted publishing only: no CARGO_REGISTRY_TOKEN fallback.
       - name: Release (per-crate)
         if: ${{ (github.ref == 'refs/heads/main' || inputs.release_dry_run) && !inputs.workspace_publish }}
         env:
-          CARGO_REGISTRY_TOKEN: ${{ steps.auth.outputs.token || secrets.CARGO_REGISTRY_TOKEN }}
-          GH_TOKEN: ${{ steps.app-token.outputs.token }}
           DEBUG: ${{ inputs.release_debug }}
           MAX_RETRIES: ${{ inputs.release_max_retries }}
           # Branches never publish for real — only a push to main with
@@ -262,6 +288,56 @@ jobs:
           }
           # True iff $1 is a strictly higher semver than $2.
           version_gt() { [ "$1" != "$2" ] && [ "$(printf '%s\n%s\n' "$1" "$2" | sort -V | tail -1)" = "$1" ]; }
+
+          # Trusted publishing exchange, as rust-lang/crates-io-auth-action
+          # does it: a GitHub OIDC token for audience crates.io, swapped for a
+          # crates.io token. Sets $token; fails if trusted publishing is not set up.
+          tp_endpoint="https://crates.io/api/v1/trusted_publishing/tokens"
+          mint_token() {
+            local jwt
+            token=""
+            [ -n "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" ] || return 1
+            jwt="$(curl -fsS -H "Authorization: bearer ${ACTIONS_ID_TOKEN_REQUEST_TOKEN}" \
+              "${ACTIONS_ID_TOKEN_REQUEST_URL}&audience=crates.io" | jq -r '.value // empty')" || return 1
+            [ -n "$jwt" ] || return 1
+            echo "::add-mask::$jwt"
+            token="$(jq -n --arg jwt "$jwt" '{jwt: $jwt}' \
+              | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- "$tp_endpoint" \
+              | jq -r '.token // empty')" || return 1
+            [ -n "$token" ] || return 1
+            echo "::add-mask::$token"
+          }
+          # A token left live fails the job at the end, after the other crates publish.
+          unrevoked=()
+          revoke_token() {
+            curl -fsS -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
+              || unrevoked+=("$2")
+          }
+
+          # Verify-build first with no token, then upload on a fresh one.
+          # --no-verify skips only that rebuild: publish still refuses an uncommitted tree.
+          # A dry run packages the crate with those already dry-run: their new
+          # versions are not on crates.io, so a dependent could not resolve them.
+          dry_done=()
+          publish_crate() {
+            local rc d
+            local -a with=()
+            if [ -n "$dry" ]; then
+              for d in "${dry_done[@]}"; do with+=(-p "$d"); done
+              cargo package "${with[@]}" -p "$1" || return 1
+              dry_done+=("$1")
+              return
+            fi
+            cargo package -p "$1" || return 1
+            if ! mint_token; then
+              echo "::error::could not mint a trusted publishing token for $1; is a trusted publisher configured for it on crates.io?"
+              return 1
+            fi
+            CARGO_REGISTRY_TOKEN="$token" cargo publish -p "$1" --no-verify
+            rc=$?
+            revoke_token "$token" "$1"
+            return "$rc"
+          }
 
           # Local versions of every publishable workspace crate (one metadata call).
           declare -A ver
@@ -301,7 +377,7 @@ jobs:
             progress=0
             for name in "${round[@]}"; do
               echo "::group::[$retries/$MAX_RETRIES] publish $name@${ver[$name]} $dry"
-              if cargo publish -p "$name" $dry; then
+              if publish_crate "$name"; then
                 echo "published $name@${ver[$name]}"
                 published+=("$name@${ver[$name]}")
                 progress=1
@@ -323,10 +399,16 @@ jobs:
 
           echo "=== Publish summary ==="
           echo "Published (${#published[@]}): ${published[*]:-none}"
+          failed=0
+          if [ "${#unrevoked[@]}" -gt 0 ]; then
+            echo "::error::could not revoke the trusted publishing token for: ${unrevoked[*]}; each expires within 30 minutes of minting"
+            failed=1
+          fi
           if [ "${#pending[@]}" -gt 0 ]; then
             echo "::error::failed to publish after ${retries} attempt(s): ${pending[*]}"
-            exit 1
+            failed=1
           fi
+          exit "$failed"
 
       # always(): a partial failure (e.g. one crate blocked on an external dep)
       # still publishes the others irreversibly, so their tags must be pushed

@@ -1,0 +1,38 @@
+name: Prepare a release
+
+# Opens the PR that prepares the next rc, GA or patch. Run it from the Actions
+# tab with the release branch as the ref. Merging the PR is the release.
+
+on:
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: "rc (next candidate), ga (rc.N -> .0) or patch (.N -> .N+1)"
+        required: true
+        type: choice
+        options: [patch, rc, ga]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-prep-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  prepare:
+    name: Prepare ${{ inputs.kind }} on ${{ github.ref_name }}
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+      - uses: affinidi/pipeline-rust/.github/actions/release-prep@<commit>
+        with:
+          kind: ${{ inputs.kind }}
+          token: ${{ steps.app.outputs.token }}

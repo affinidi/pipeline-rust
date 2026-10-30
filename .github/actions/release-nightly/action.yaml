@@ -1,0 +1,76 @@
+# Fast-forwards the `nightly` branch to the newest main commit on which every
+# job of the CI workflow passed, so a release is cut from a fully green commit
+# rather than main's tip. Jobs are read from each run's latest attempt rather
+# than the run's conclusion. Never moves nightly anywhere but forward.
+#
+# token moves nightly. Where a ruleset lets only the release bot update
+# nightly, pass a GitHub App token with contents write and actions read.
+name: Advance nightly
+description: Fast-forward nightly to the newest fully green main commit.
+
+inputs:
+  workflow:
+    description: "File name of the CI workflow whose runs on main gate nightly."
+    required: false
+    default: ci.yml
+  token:
+    description: "Token that moves nightly (contents write, actions read)."
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Find the newest fully green main commit and fast-forward to it
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        WORKFLOW: ${{ inputs.workflow }}
+      run: |
+        set -euo pipefail
+        [[ "${WORKFLOW}" =~ ^[A-Za-z0-9._-]+$ ]] || { echo "::error::workflow must be a file name"; exit 1; }
+        # Test the exit status, not the output: on a 404 `gh api` prints the
+        # error body to stdout.
+        if ! current=$(gh api "repos/${REPO}/git/ref/heads/nightly" --jq .object.sha 2>/dev/null); then
+          current=""
+        fi
+        echo "nightly is at ${current:-<none>}"
+
+        runs="${RUNNER_TEMP}/nightly-runs.txt"
+        gh api "repos/${REPO}/actions/workflows/${WORKFLOW}/runs?branch=main&event=push&status=success&per_page=30" \
+          --jq '.workflow_runs[] | "\(.id) \(.head_sha)"' > "${runs}"
+
+        target=""
+        while read -r id sha; do
+          bad=$(gh api --paginate "repos/${REPO}/actions/runs/${id}/jobs?filter=latest&per_page=100" \
+            --jq '.jobs[] | select(.conclusion != "success" and .conclusion != "skipped") | .name')
+          if [ -n "${bad}" ]; then
+            echo "skip ${sha} (run ${id}): $(echo "${bad}" | tr '\n' ',')"
+            continue
+          fi
+          target=${sha}
+          echo "newest green: ${sha} (run ${id})"
+          break
+        done < "${runs}"
+
+        if [ -z "${target}" ]; then
+          echo "::warning::no fully green main run among the last 30; nightly stays at ${current:-<none>}"
+          exit 0
+        fi
+        if [ -z "${current}" ]; then
+          gh api -X POST "repos/${REPO}/git/refs" -f ref=refs/heads/nightly -f sha="${target}" >/dev/null
+          echo "created nightly at ${target}"
+          exit 0
+        fi
+        status=$(gh api "repos/${REPO}/compare/${current}...${target}" --jq .status)
+        case "${status}" in
+          identical) echo "nightly already at ${target}" ;;
+          ahead)
+            # force=false: the API refuses anything but a fast-forward.
+            gh api -X PATCH "repos/${REPO}/git/refs/heads/nightly" -f sha="${target}" -F force=false >/dev/null
+            echo "nightly: ${current} -> ${target}" ;;
+          *)
+            echo "::error::newest green main (${target}) is ${status} relative to nightly (${current}); not moving it"
+            exit 1 ;;
+        esac
