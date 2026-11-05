@@ -1,0 +1,42 @@
+# Every commit in a PR carries a `Signed-off-by:` trailer (the Developer
+# Certificate of Origin, https://developercertificate.org). Merge commits are
+# skipped. Reads commit metadata only and checks out no PR code. The release
+# tooling and the backport action sign off their own commits.
+name: DCO sign-off
+description: Fail when a commit in the pull request has no Signed-off-by trailer.
+
+inputs:
+  token:
+    description: "Token that can read the pull request's commits."
+    required: false
+    default: ${{ github.token }}
+
+runs:
+  using: composite
+  steps:
+    - name: Every commit is signed off
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        REPO: ${{ github.repository }}
+        PR: ${{ github.event.pull_request.number }}
+      run: |
+        set -euo pipefail
+        commits="${RUNNER_TEMP}/dco-commits.tsv"
+        gh api --paginate "repos/${REPO}/pulls/${PR}/commits?per_page=100" \
+          --jq '.[] | [.sha, (.parents | length | tostring), (.commit.message | @base64)] | @tsv' \
+          > "${commits}"
+        bad=0
+        while IFS=$'\t' read -r sha parents msg64; do
+          [ "${parents}" -gt 1 ] && continue
+          msg=$(printf '%s' "${msg64}" | base64 -d)
+          if ! printf '%s\n' "${msg}" | grep -qiE '^Signed-off-by: .+ <[^>]+>$'; then
+            echo "::error::commit ${sha:0:12} has no Signed-off-by trailer"
+            bad=1
+          fi
+        done < "${commits}"
+        if [ "${bad}" -ne 0 ]; then
+          echo "Sign off every commit: git rebase --signoff origin/<base-branch> && git push --force-with-lease"
+          exit 1
+        fi
+        echo "all $(wc -l < "${commits}" | tr -d ' ') commit(s) signed off"

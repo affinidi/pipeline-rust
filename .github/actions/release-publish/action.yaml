@@ -1,0 +1,90 @@
+# Publishes a lockstep workspace to crates.io from a release branch, with
+# crates.io Trusted Publishing only. A no-op unless RELEASE names a GA or patch
+# version equal to the workspace version, and only crates not yet on crates.io
+# are published, in dependency order, so a re-run resumes after a failure.
+# Each crate is verify-built first and then uploaded with its own freshly
+# minted token, so no release outlives a token.
+#
+# The calling job needs `permissions: id-token: write` and the environment its
+# trusted publishers name. Each crate's trusted publisher on crates.io names
+# the calling repository, the CALLING workflow's file name and that
+# environment: renaming the workflow breaks publishing.
+name: Publish crates
+description: Publish a lockstep workspace to crates.io from a release branch with Trusted Publishing.
+
+inputs:
+  dry-run:
+    description: "Verify-build every pending crate but upload nothing and mint no token."
+    required: false
+    default: "false"
+  toolchain:
+    description: "Rust toolchain. Empty reads rust-toolchain.toml, else stable."
+    required: false
+    default: ""
+  rustflags:
+    description: "RUSTFLAGS for the verify builds."
+    required: false
+    default: ""
+  ubuntu-rust-deps:
+    description: "apt packages the build needs, space separated."
+    required: false
+    default: ""
+  build-jobs:
+    description: "Parallel rustc jobs for the verify builds (CARGO_BUILD_JOBS); 0 keeps cargo's default."
+    required: false
+    default: "0"
+
+runs:
+  using: composite
+  steps:
+    - name: Check the inputs
+      shell: bash
+      env:
+        DRY_RUN: ${{ inputs.dry-run }}
+        BUILD_JOBS: ${{ inputs.build-jobs }}
+      run: |
+        set -euo pipefail
+        [[ "${DRY_RUN}" =~ ^(true|false)$ ]] || { echo "::error::dry-run must be true or false"; exit 1; }
+        [[ "${BUILD_JOBS}" =~ ^[0-9]+$ ]] || { echo "::error::build-jobs must be a number"; exit 1; }
+        if [ "${DRY_RUN}" = "true" ]; then
+          echo "PUBLISH_ARGS=--dry-run" >> "${GITHUB_ENV}"
+        else
+          echo "PUBLISH_ARGS=" >> "${GITHUB_ENV}"
+        fi
+        if [ "${BUILD_JOBS}" != "0" ]; then
+          echo "CARGO_BUILD_JOBS=${BUILD_JOBS}" >> "${GITHUB_ENV}"
+        fi
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        persist-credentials: false
+    # Cheap and first: decides whether this push publishes anything, before a
+    # toolchain is installed. Fails when RELEASE and the workspace disagree.
+    - name: Should this push publish?
+      id: gate
+      shell: bash
+      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/publish-crates.py" gate ${PUBLISH_ARGS}
+    - uses: actions-rust-lang/setup-rust-toolchain@166cdcfd11aee3cb47222f9ddb555ce30ddb9659 # v1.17.0
+      if: steps.gate.outputs.publish == 'true'
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        rustflags: ${{ inputs.rustflags }}
+        cache: false
+    - name: Install native dependencies
+      if: steps.gate.outputs.publish == 'true' && inputs.ubuntu-rust-deps != ''
+      shell: bash
+      env:
+        DEPS: ${{ inputs.ubuntu-rust-deps }}
+      run: |
+        set -euo pipefail
+        read -r -a deps <<< "${DEPS}"
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends "${deps[@]}"
+    - name: Publish
+      if: steps.gate.outputs.publish == 'true'
+      shell: bash
+      run: |
+        set -euo pipefail
+        script="${GITHUB_ACTION_PATH}/../../../scripts/release-branch/publish-crates.py"
+        python3 "${script}" plan ${PUBLISH_ARGS}
+        python3 "${script}" publish ${PUBLISH_ARGS}
+        python3 "${script}" check-all ${PUBLISH_ARGS}

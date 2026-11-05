@@ -1,0 +1,39 @@
+# Where a PR may go and what it may change: a fix reaches release/<major.minor>
+# by backport (or with the release-direct label), and only the release tooling
+# moves versions or RELEASE. Call it on pull_request into main and release/**,
+# with types opened, synchronize, reopened, labeled and unlabeled, and
+# permissions contents: read and pull-requests: read. Cut, prep and backport PRs
+# count only when Affinidi's release bot opened them, and release-direct only
+# when a maintainer added it.
+name: Release branch rules
+description: Check a PR against the release-branch rules.
+
+inputs:
+  maintainer-releases:
+    # Transitional, for a repository that still cuts and preps with local scripts; switch to the release workflows and drop it.
+    description: "Also accept a cut or prep PR opened by a person with the admin or maintain role."
+    required: false
+    default: "false"
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      with:
+        # The merge commit and its first parent: the PR's effect on the base.
+        fetch-depth: 2
+        persist-credentials: false
+    - name: Check the PR against the branch rules
+      shell: bash
+      env:
+        BASE_REF: ${{ github.base_ref }}
+        HEAD_REF: ${{ github.head_ref }}
+        LABELS: ${{ toJSON(github.event.pull_request.labels.*.name) }}
+        REPO: ${{ github.repository }}
+        PR_NUMBER: ${{ github.event.pull_request.number }}
+        HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+        AUTHOR: ${{ github.event.pull_request.user.login }}
+        AUTHOR_ID: ${{ github.event.pull_request.user.id }}
+        MAINTAINER_RELEASES: ${{ inputs.maintainer-releases }}
+        GITHUB_TOKEN: ${{ github.token }}
+      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/check-branch-rules.py"

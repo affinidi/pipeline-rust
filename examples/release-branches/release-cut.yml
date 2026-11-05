@@ -1,0 +1,49 @@
+name: Cut a release
+
+# Creates release/<major.minor> and opens the PR that moves main to the next
+# minor. Run it from the Actions tab on main.
+
+on:
+  workflow_dispatch:
+    inputs:
+      name:
+        description: "major.minor, e.g. 0.4"
+        required: true
+        type: string
+      from:
+        description: "Revision to cut from (origin/main before nightly exists)"
+        required: true
+        type: string
+        default: origin/nightly
+      dry-run:
+        description: "Build both commits, push nothing"
+        required: true
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-cut
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    name: Cut release/${{ inputs.name }}
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 30
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+      - uses: affinidi/pipeline-rust/.github/actions/release-cut@<commit>
+        with:
+          name: ${{ inputs.name }}
+          from: ${{ inputs.from }}
+          dry-run: ${{ inputs.dry-run }}
+          token: ${{ steps.app.outputs.token }}

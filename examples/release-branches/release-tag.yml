@@ -1,0 +1,32 @@
+name: Tag a release
+
+# A push to a release branch that moves RELEASE (the cut, or a merged prep PR)
+# tags v<RELEASE> with the release bot: a tag ruleset usually blocks GITHUB_TOKEN.
+
+on:
+  push:
+    branches: ["release/**"]
+    paths: [RELEASE]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-tag-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  tag:
+    name: Tag v<RELEASE>
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@64ab729a6294000f5aa4a4bc0b73d1f32bc45510 # v3.3.0
+        id: app
+        with:
+          app-id: ${{ secrets.RELEASE_BOT_APP_ID }}
+          private-key: ${{ secrets.RELEASE_BOT_PRIVATE_KEY }}
+      - uses: affinidi/pipeline-rust/.github/actions/release-tag@<commit>
+        with:
+          token: ${{ steps.app.outputs.token }}

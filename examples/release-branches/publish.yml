@@ -1,0 +1,29 @@
+name: Publish crates
+
+# The file name matters: each crate's trusted publisher on crates.io names this
+# repository, publish.yml and the release environment.
+
+on:
+  push:
+    branches: ["release/**"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish to crates.io
+    if: startsWith(github.ref, 'refs/heads/release/')
+    runs-on: ubuntu-24.04
+    environment: release
+    timeout-minutes: 120
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - uses: affinidi/pipeline-rust/.github/actions/release-publish@<commit>

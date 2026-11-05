@@ -105,6 +105,81 @@ Release rules:
 - The tag must equal `v` plus the version in the owning package's
   `Cargo.toml`, so `v1.4.0` for version `1.4.0`.
 
+## Release branches
+
+An alternative to `release.yaml` for a workspace that versions every crate in
+lockstep and supports releases on their own branches. `main` carries the next
+version and never publishes; a release is cut to `release/<major.minor>`,
+stabilised with release candidates, published at GA and patched by backport.
+
+| Step | Action | `RELEASE` | Tag | crates.io |
+|---|---|---|---|---|
+| Cut | `release-cut` | `0.4.0-rc.0` | `v0.4.0-rc.0` (prerelease) | no |
+| Next candidate | `release-prep`, kind `rc` | `0.4.0-rc.N` | `v0.4.0-rc.N` | no |
+| GA | `release-prep`, kind `ga` | `0.4.0` | `v0.4.0` | `0.4.0` |
+| Patch | `release-prep`, kind `patch` | `0.4.N` | `v0.4.N` | `0.4.N` |
+
+Merging a prep PR is the release: `release-tag` tags it and `release-publish`
+publishes it. The other actions keep the flow honest: `release-guards`
+(lockstep versions, CHANGELOG.md and RELEASE agree), `release-branch-rules`
+(fixes reach a release branch by backport, only the tooling moves versions),
+`release-backport`, `release-nightly` (cuts come from the newest fully green
+`main`) and `release-dco`.
+
+They are composite actions under `.github/actions/release-*`; each checks out
+the repository itself. The scripts they run are in `scripts/release-branch`
+and come with the action at the ref you pin, so nothing is copied into your
+repository. They need Python 3.11 or later on the runner.
+
+`release-publish` uses crates.io Trusted Publishing only. It verify-builds
+each crate, then mints a token for that crate alone, uploads and revokes it,
+so a long release never outlives a 30-minute token. Because the action runs
+inside your workflow, the trusted publisher on crates.io names your
+repository, your workflow file and its environment.
+
+`release-cut`, `release-prep` and `release-backport` need a `token` from
+Affinidi's release bot app, `affinidi-semantic-release`: what `GITHUB_TOKEN`
+pushes or opens triggers no workflow, and `release-branch-rules` accepts a
+cut, prep or backport PR only from a branch of the repository opened by that
+app, since anyone can name a branch.
+`maintainer-releases: "true"` also accepts a cut or prep PR opened by a person
+with the admin or maintain role, for a repository that still cuts and preps
+with local scripts. It is transitional: use the `release-cut` and
+`release-prep` workflows instead.
+`release-cut` also refuses unless whoever started the run has the admin or
+maintain role, so not everyone who may run a workflow can cut.
+`release-tag` needs one that may create tags under your tag rules.
+
+### Adopting release branches
+
+Copy the workflows in [`examples/release-branches`](examples/release-branches)
+to `.github/workflows/` and pin every `@<commit>` to one pipeline-rust commit.
+
+The workspace needs one version for every crate (`version.workspace = true`,
+and internal dependencies requiring exactly it), a `CHANGELOG.md` with an
+`## Unreleased` section on `main`, and a `RELEASES.md` for contributors: the
+checks' messages point to it. Start from the
+[template](examples/release-branches/RELEASES.md).
+
+The repository needs:
+
+- a GitHub App installed on it, with `RELEASE_BOT_APP_ID` and
+  `RELEASE_BOT_PRIVATE_KEY` secrets;
+- an environment `release` holding the private key, allowing `main` and
+  `release/*`;
+- rulesets that let the app create tags and release branches, and protect
+  `release/*` (PR with approval of the most recent push, the `branch rules`,
+  `release guards` and `DCO sign-off` checks, no force push or deletion) and
+  `nightly` (only the app, maintainers and admins create or update it; no
+  force push or deletion);
+- for each crate, a crates.io trusted publisher naming the repository,
+  `publish.yml` and `release`. A new crate's first version is published by
+  hand.
+
+Before `nightly` exists, cut from `origin/main`.
+
+To cut, prepare and backport, see [How to release](docs/how-to-release.md).
+
 ## Choosing the runner
 
 `checks.yaml`, `checks-no-test.yaml` and `checks-test-only.yaml` take an
