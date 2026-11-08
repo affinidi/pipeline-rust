@@ -293,6 +293,10 @@ jobs:
           # does it: a GitHub OIDC token for audience crates.io, swapped for a
           # crates.io token. Sets $token; fails if trusted publishing is not set up.
           tp_endpoint="https://crates.io/api/v1/trusted_publishing/tokens"
+          # crates.io refuses curl's default User-Agent with a bare 403, before
+          # it reads the request; the API's data access policy asks every
+          # client to name itself.
+          tp_ua="affinidi-pipeline-rust (https://github.com/affinidi/pipeline-rust)"
           mint_token() {
             local jwt
             token=""
@@ -302,7 +306,7 @@ jobs:
             [ -n "$jwt" ] || return 1
             echo "::add-mask::$jwt"
             token="$(jq -n --arg jwt "$jwt" '{jwt: $jwt}' \
-              | curl -fsS -X POST -H 'Content-Type: application/json' --data-binary @- "$tp_endpoint" \
+              | curl -fsS -A "$tp_ua" -X POST -H 'Content-Type: application/json' --data-binary @- "$tp_endpoint" \
               | jq -r '.token // empty')" || return 1
             [ -n "$token" ] || return 1
             echo "::add-mask::$token"
@@ -310,7 +314,7 @@ jobs:
           # A token left live fails the job at the end, after the other crates publish.
           unrevoked=()
           revoke_token() {
-            curl -fsS -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
+            curl -fsS -A "$tp_ua" -o /dev/null -X DELETE -H "Authorization: Bearer $1" "$tp_endpoint" \
               || unrevoked+=("$2")
           }
 
