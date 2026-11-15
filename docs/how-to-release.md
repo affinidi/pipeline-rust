@@ -26,10 +26,12 @@ A cut creates `release/0.4` at `0.4.0-rc.0` and moves `main` to `0.5.0`.
    - pushes `release/0.4`, which **Tag a release** tags `v0.4.0-rc.0`
      (a prerelease; nothing is published to crates.io);
    - opens the `release-cut/0.4` PR, which moves `main` to `0.5.0` and closes
-     `main`'s `## Unreleased` changelog section under `## 0.4.0`;
+     `main`'s `## Unreleased` changelog section under `## 0.4.0 (unreleased)`
+     (the GA prep dates that heading; see below);
    - creates the `backport release/0.4` label.
 4. Review and merge `release-cut/0.4`. If the log warned that `CHANGELOG.md`
-   was not split, move the shipped entries under `## 0.4.0` in that PR first.
+   was not split, move the shipped entries under `## 0.4.0 (unreleased)` in
+   that PR first.
 5. Add `0.4` to the schedule in `RELEASES.md`.
 
 The cut refuses:
@@ -49,15 +51,27 @@ The cut refuses:
    | `kind` | `RELEASE` moves | Also |
    |---|---|---|
    | `rc` | `0.4.0-rc.N` → `0.4.0-rc.N+1` | |
-   | `ga` | `0.4.0-rc.N` → `0.4.0` | `## Unreleased` becomes `## 0.4.0 (date)` |
+   | `ga` | `0.4.0-rc.N` → `0.4.0` | `## Unreleased` becomes `## 0.4.0 (date)`; a second PR dates `main`'s heading the same |
    | `patch` | `0.4.N` → `0.4.N+1` | every crate moves to `0.4.N+1`; a changelog section lists the commits since `v0.4.N` |
 
 2. It opens the `release-prep/0.4/<version>` PR, titled
    `chore(release): v<version>`. Review `RELEASE`, the changelog and, for a
    patch, the versions.
+
+   A GA also opens `release-date/0.4` into `main`, titled
+   `chore(release): date 0.4.0 in main's changelog`. It turns `main`'s
+   `## 0.4.0 (unreleased)` (or the `## 0.4.0 (release/0.4)` older cuts wrote)
+   into the heading the release branch just got, `## 0.4.0 (date)`, so the two
+   branches' changelogs agree. Rerunning the GA prep on a later day updates
+   that PR. If `main` has no `## 0.4.0` heading (the cut PR is not merged),
+   the log warns and no PR opens.
 3. Merge it. That is the release: **Tag a release** tags `v<version>` and
    opens its GitHub Release, and for a GA or patch **Publish crates**
-   publishes to crates.io.
+   publishes to crates.io. For a GA, merge the `release-date/0.4` PR once the
+   `v0.4.0` tag exists, so `main` never dates a release that has not happened.
+
+   The prep can be rerun: it replaces its own `release-prep/0.4/<version>`
+   and `release-date/0.4` branches and updates their open PRs.
 
 The prep refuses:
 
@@ -121,6 +135,23 @@ git switch -c "release-prep/0.4/$v"
 git add -A && git commit -s -m "chore(release): v$v"
 git push origin HEAD
 gh pr create --base release/0.4 --title "chore(release): v$v" --body-file ../body.md
+```
+
+For a GA, date `main`'s heading in the same run: check `main` out beside the
+release branch first and pass its changelog.
+
+```sh
+git worktree add --detach ../main-date origin/main
+python3 $S/prepare-release.py --kind ga --pr-body ../body.md --main-changelog ../main-date/CHANGELOG.md
+# ... the release-prep PR as above, then, unless main was already dated:
+if ! git -C ../main-date diff --quiet; then
+  git -C ../main-date switch -c release-date/0.4
+  git -C ../main-date commit -s -am "chore(release): date $v in main's changelog"
+  git -C ../main-date push origin HEAD
+  gh pr create --base main --head release-date/0.4 --title "chore(release): date $v in main's changelog" \
+    --body "Merge once the v$v tag exists."
+fi
+git worktree remove --force ../main-date
 ```
 
 Then step 3 of [Release candidate, GA, patch](#release-candidate-ga-patch).

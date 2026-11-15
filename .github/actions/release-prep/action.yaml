@@ -3,6 +3,10 @@
 # workspace version. Merging that PR is the release. Run it from a
 # workflow_dispatch workflow with the release branch selected as the ref.
 #
+# A GA also opens (or updates) a release-date/<major.minor> PR to main that
+# dates main's `## <major.minor>.0 …` changelog heading with the date the GA
+# gives the release branch, so both read `## <major.minor>.0 (date)`.
+#
 # token opens the PR. A PR opened with GITHUB_TOKEN runs no CI, and an
 # organisation may not let GITHUB_TOKEN open PRs at all, so pass a GitHub App
 # token with contents and pull-requests write: release-branch-rules accepts a
@@ -60,11 +64,20 @@ runs:
         toolchain: ${{ inputs.toolchain }}
         rustflags: ""
         cache: false
+    - name: Check out main beside the release branch (GA)
+      if: inputs.kind == 'ga'
+      shell: bash
+      # fetch-depth 0 fetched every branch, origin/main included.
+      run: git worktree add --detach "${RUNNER_TEMP}/main" origin/main
     - name: Bump versions, write the changelog, move RELEASE
       shell: bash
       env:
         KIND: ${{ inputs.kind }}
-      run: python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/prepare-release.py" --kind "${KIND}" --pr-body "${RUNNER_TEMP}/body.md"
+      run: |
+        set -euo pipefail
+        args=(--kind "${KIND}" --pr-body "${RUNNER_TEMP}/body.md")
+        [ "${KIND}" = "ga" ] && args+=(--main-changelog "${RUNNER_TEMP}/main/CHANGELOG.md")
+        python3 "${GITHUB_ACTION_PATH}/../../../scripts/release-branch/prepare-release.py" "${args[@]}"
     - name: Open the PR
       shell: bash
       env:
@@ -80,6 +93,43 @@ runs:
         git switch -c "${head}"
         git add -A
         git commit -s -m "chore(release): v${target}"
-        git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
-        gh pr create --base "${BASE}" --head "${head}" --title "chore(release): v${target}" \
-          --body-file "${RUNNER_TEMP}/body.md"
+        # Force and reuse an open PR, so a rerun (after the main-dating step
+        # below failed, say) replaces its own earlier branch instead of dying.
+        git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
+        if [ -n "$(gh pr list --repo "${REPO}" --base "${BASE}" --head "${head}" --state open --json number --jq '.[].number')" ]; then
+          gh pr edit "${head}" --repo "${REPO}" --body-file "${RUNNER_TEMP}/body.md"
+        else
+          gh pr create --base "${BASE}" --head "${head}" --title "chore(release): v${target}" \
+            --body-file "${RUNNER_TEMP}/body.md"
+        fi
+    - name: Open the PR that dates main's changelog heading (GA)
+      if: inputs.kind == 'ga'
+      shell: bash
+      env:
+        GH_TOKEN: ${{ inputs.token }}
+        BASE: ${{ github.ref_name }}
+        REPO: ${{ github.repository }}
+      run: |
+        set -euo pipefail
+        target=$(cat RELEASE)
+        cd "${RUNNER_TEMP}/main"
+        if git diff --quiet; then
+          echo "main's CHANGELOG.md needs no change"
+          exit 0
+        fi
+        name="${BASE#release/}"
+        head="release-date/${name}"
+        title="chore(release): date ${target} in main's changelog"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git switch -c "${head}"
+        git add CHANGELOG.md
+        git commit -s -m "${title}"
+        # A re-run of the GA prep replaces an earlier, still-open dating PR.
+        git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
+        if [ -n "$(gh pr list --repo "${REPO}" --base main --head "${head}" --state open --json number --jq '.[].number')" ]; then
+          gh pr edit "${head}" --repo "${REPO}" --title "${title}"
+        else
+          gh pr create --repo "${REPO}" --base main --head "${head}" --title "${title}" --body \
+            "Gives \`## ${target}\` on main the date the GA prep gave it on \`${BASE}\`, so both branches carry the same heading. Merge it once the \`v${target}\` prep PR is merged and the tag exists."
+        fi

@@ -247,6 +247,53 @@ def insert_section(changelog, section):
     return f"{changelog[: m.start()]}{section}{changelog[m.start() :]}"
 
 
+def release_heading(version, date):
+    """The heading a released version carries on both sides: `## 0.42.0 (2026-11-16)`.
+
+    The GA prep writes it on the release branch and dates main's copy with the
+    same string, so the two never differ.
+    """
+    return f"## {version} ({date})"
+
+
+def pending_heading(version):
+    """main's heading for a version that is cut but not yet GA: `## 0.42.0 (unreleased)`."""
+    return f"## {version} (unreleased)"
+
+
+def close_unreleased(changelog, version):
+    """main's CHANGELOG at the cut: `## Unreleased` becomes `version`'s pending section.
+
+    A fresh, empty `## Unreleased` opens above it. None if there is no
+    `## Unreleased` section.
+    """
+    parts = unreleased_split(changelog)
+    if not parts:
+        return None
+    before, body, after = parts
+    return f"{before}## Unreleased\n\n{pending_heading(version)}\n{body}{after}"
+
+
+def date_heading(changelog, version, date):
+    """`changelog` with `version`'s heading replaced by `release_heading(version, date)`.
+
+    Matches whatever the heading says after the version, so it dates the
+    pending form (`## 0.42.0 (unreleased)`), the form older cuts wrote
+    (`## 0.42.0 (release/0.42)`) and a heading dated earlier alike. Only the
+    first heading for `version` is touched, and a CRLF line keeps its `\\r`. None
+    if there is none.
+    """
+    m = version_heading(version).search(changelog)
+    if not m:
+        return None
+    return f"{changelog[: m.start()]}{release_heading(version, date)}{m.group(1)}{changelog[m.end() :]}"
+
+
+def version_heading(version):
+    """Matches a `## <version> …` heading line; group 1 is a CRLF line's `\\r`, kept on rewrite."""
+    return re.compile(rf"^## \[?{re.escape(version)}\]?(?:[ \t][^\r\n]*)?(\r?)$", re.MULTILINE)
+
+
 def unreleased_split(changelog):
     """(before, body, after) around the `## Unreleased` section, or None."""
     m = re.search(r"^## Unreleased[^\n]*\n", changelog, re.MULTILINE)

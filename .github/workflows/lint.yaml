@@ -37,3 +37,7 @@ jobs:
         run: uvx ruff@0.17.3 format --check
       - name: Python types (uv check)
         run: uv check --no-project --preview-features check-command --ty-version 0.0.93
+      - name: Python tests (release-branch scripts)
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: uv run --no-project --python 3.12 python -m unittest discover -s scripts/release-branch -p 'test_*.py' -v

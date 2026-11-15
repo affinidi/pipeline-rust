@@ -120,7 +120,10 @@ stabilised with release candidates, published at GA and patched by backport.
 | Patch | `release-prep`, kind `patch` | `0.4.N` | `v0.4.N` | `0.4.N` |
 
 Merging a prep PR is the release: `release-tag` tags it and `release-publish`
-publishes it. The other actions keep the flow honest: `release-guards`
+publishes it. `main` keeps the release's changelog under
+`## 0.4.0 (unreleased)` from the cut; the GA prep also opens a
+`release-date/0.4` PR to `main` that gives it the GA's heading,
+`## 0.4.0 (date)`, the same as the release branch's. The other actions keep the flow honest: `release-guards`
 (lockstep versions, CHANGELOG.md and RELEASE agree), `release-branch-rules`
 (fixes reach a release branch by backport, only the tooling moves versions),
 `release-backport`, `release-nightly` (cuts come from the newest fully green
@@ -171,7 +174,10 @@ The repository needs:
   `release/*` (PR with approval of the most recent push, the `branch rules`,
   `release guards` and `DCO sign-off` checks, no force push or deletion) and
   `nightly` (only the app, maintainers and admins create or update it; no
-  force push or deletion);
+  force push or deletion). The app creates its own `release-cut/*`,
+  `release-prep/*` and `release-date/*` branches, and a rerun of the prep
+  force-pushes the last two: a ruleset that limits branch creation or force
+  pushes must let it;
 - for each crate, a crates.io trusted publisher naming the repository,
   `publish.yml` and `release`. A new crate's first version is published by
   hand.
