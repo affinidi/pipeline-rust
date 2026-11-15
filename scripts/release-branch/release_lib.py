@@ -280,13 +280,18 @@ def date_heading(changelog, version, date):
     Matches whatever the heading says after the version, so it dates the
     pending form (`## 0.42.0 (unreleased)`), the form older cuts wrote
     (`## 0.42.0 (release/0.42)`) and a heading dated earlier alike. Only the
-    first heading for `version` is touched. None if there is none.
+    first heading for `version` is touched, and a CRLF line keeps its `\\r`. None
+    if there is none.
     """
-    pattern = re.compile(rf"^## \[?{re.escape(version)}\]?(?:[ \t][^\n]*)?$", re.MULTILINE)
-    m = pattern.search(changelog)
+    m = version_heading(version).search(changelog)
     if not m:
         return None
-    return f"{changelog[: m.start()]}{release_heading(version, date)}{changelog[m.end() :]}"
+    return f"{changelog[: m.start()]}{release_heading(version, date)}{m.group(1)}{changelog[m.end() :]}"
+
+
+def version_heading(version):
+    """Matches a `## <version> …` heading line; group 1 is a CRLF line's `\\r`, kept on rewrite."""
+    return re.compile(rf"^## \[?{re.escape(version)}\]?(?:[ \t][^\r\n]*)?(\r?)$", re.MULTILINE)
 
 
 def unreleased_split(changelog):

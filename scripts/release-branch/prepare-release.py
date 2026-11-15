@@ -49,6 +49,7 @@ from release_lib import (
     release_heading,
     set_version,
     unreleased_split,
+    version_heading,
     workspace_version,
 )
 
@@ -66,7 +67,13 @@ def date_main(path, version, date):
     if not main_log.exists():
         print(f"WARNING: {path} does not exist; main's changelog not dated", file=sys.stderr)
         return
-    text = main_log.read_text()
+    # newline="" keeps the file's line endings: a CRLF changelog is not rewritten wholesale.
+    with open(main_log, newline="") as f:
+        text = f.read()
+    if len(version_heading(version).findall(text)) > 1:
+        print(
+            f"WARNING: main's CHANGELOG.md has more than one `## {version}` heading; dating the first", file=sys.stderr
+        )
     dated = date_heading(text, version, date)
     if dated is None:
         print(
@@ -77,7 +84,8 @@ def date_main(path, version, date):
     elif dated == text:
         print(f"main's CHANGELOG.md already reads `{release_heading(version, date)}`")
     else:
-        main_log.write_text(dated)
+        with open(main_log, "w", newline="") as f:
+            f.write(dated)
         print(f"main's CHANGELOG.md: `## {version}` heading dated {date}")
 
 

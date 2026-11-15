@@ -65,9 +65,13 @@ The cut refuses:
    branches' changelogs agree. Rerunning the GA prep on a later day updates
    that PR. If `main` has no `## 0.4.0` heading (the cut PR is not merged),
    the log warns and no PR opens.
-3. Merge it, and for a GA the `release-date/0.4` PR too. That is the release:
-   **Tag a release** tags `v<version>` and opens its GitHub Release, and for a
-   GA or patch **Publish crates** publishes to crates.io.
+3. Merge it. That is the release: **Tag a release** tags `v<version>` and
+   opens its GitHub Release, and for a GA or patch **Publish crates**
+   publishes to crates.io. For a GA, merge the `release-date/0.4` PR once the
+   `v0.4.0` tag exists, so `main` never dates a release that has not happened.
+
+   The prep can be rerun: it replaces its own `release-prep/0.4/<version>`
+   and `release-date/0.4` branches and updates their open PRs.
 
 The prep refuses:
 
@@ -139,10 +143,15 @@ release branch first and pass its changelog.
 ```sh
 git worktree add --detach ../main-date origin/main
 python3 $S/prepare-release.py --kind ga --pr-body ../body.md --main-changelog ../main-date/CHANGELOG.md
-# ... the release-prep PR as above, then:
-cd ../main-date && git switch -c release-date/0.4
-git commit -s -am "chore(release): date $v in main's changelog"
-git push origin HEAD && gh pr create --base main --fill
+# ... the release-prep PR as above, then, unless main was already dated:
+if ! git -C ../main-date diff --quiet; then
+  git -C ../main-date switch -c release-date/0.4
+  git -C ../main-date commit -s -am "chore(release): date $v in main's changelog"
+  git -C ../main-date push origin HEAD
+  gh pr create --base main --head release-date/0.4 --title "chore(release): date $v in main's changelog" \
+    --body "Merge once the v$v tag exists."
+fi
+git worktree remove --force ../main-date
 ```
 
 Then step 3 of [Release candidate, GA, patch](#release-candidate-ga-patch).

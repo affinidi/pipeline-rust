@@ -93,9 +93,15 @@ runs:
         git switch -c "${head}"
         git add -A
         git commit -s -m "chore(release): v${target}"
-        git push "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
-        gh pr create --base "${BASE}" --head "${head}" --title "chore(release): v${target}" \
-          --body-file "${RUNNER_TEMP}/body.md"
+        # Force and reuse an open PR, so a rerun (after the main-dating step
+        # below failed, say) replaces its own earlier branch instead of dying.
+        git push --force "https://x-access-token:${GH_TOKEN}@github.com/${REPO}.git" "HEAD:refs/heads/${head}"
+        if [ -n "$(gh pr list --repo "${REPO}" --base "${BASE}" --head "${head}" --state open --json number --jq '.[].number')" ]; then
+          gh pr edit "${head}" --repo "${REPO}" --body-file "${RUNNER_TEMP}/body.md"
+        else
+          gh pr create --base "${BASE}" --head "${head}" --title "chore(release): v${target}" \
+            --body-file "${RUNNER_TEMP}/body.md"
+        fi
     - name: Open the PR that dates main's changelog heading (GA)
       if: inputs.kind == 'ga'
       shell: bash
@@ -125,5 +131,5 @@ runs:
           gh pr edit "${head}" --repo "${REPO}" --title "${title}"
         else
           gh pr create --repo "${REPO}" --base main --head "${head}" --title "${title}" --body \
-            "Gives \`## ${target}\` on main the date the GA prep gave it on \`${BASE}\`, so both branches carry the same heading. Merge it with the \`v${target}\` prep PR."
+            "Gives \`## ${target}\` on main the date the GA prep gave it on \`${BASE}\`, so both branches carry the same heading. Merge it once the \`v${target}\` prep PR is merged and the tag exists."
         fi

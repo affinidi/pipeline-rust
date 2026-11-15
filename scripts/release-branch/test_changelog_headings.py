@@ -2,12 +2,17 @@
 
     python3 -m unittest discover -s scripts/release-branch -p 'test_*.py'
 
+with Python 3.11 or later (release_lib reads Cargo.toml with tomllib).
+
 main and the release branch must end up with the same `## 0.42.0 (date)`
 heading: the cut writes main's as `## 0.42.0 (unreleased)`, the GA prep dates
 the release branch's and main's with one date.
 """
 
+import contextlib
 import datetime
+import importlib.util
+import io
 import os
 import pathlib
 import subprocess
@@ -18,6 +23,15 @@ import unittest
 from release_lib import close_unreleased, date_heading, pending_heading, release_heading
 
 HERE = pathlib.Path(__file__).resolve().parent
+
+
+def load_prepare_release():
+    spec = importlib.util.spec_from_file_location("prepare_release", HERE / "prepare-release.py")
+    assert spec and spec.loader
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
 
 MAIN_BEFORE_CUT = """# Changelog
 
@@ -73,9 +87,58 @@ class Headings(unittest.TestCase):
         self.assertEqual(dated, text.replace("## 0.4.0 (release/0.4)", "## 0.4.0 (2026-11-16)"))
         self.assertIsNone(date_heading("## Unreleased\n\n## 0.42.10 (unreleased)\n", "0.42.1", "2026-11-16"))
 
+    def test_date_heading_keeps_crlf(self):
+        text = "## Unreleased\r\n\r\n## 0.42.0 (unreleased)\r\n\r\n- feat: x\r\n"
+        self.assertEqual(date_heading(text, "0.42.0", "2026-11-16"), text.replace("(unreleased)", "(2026-11-16)"))
+
     def test_date_heading_is_idempotent(self):
         text = "## Unreleased\n\n## 0.42.0 (2026-11-16)\n"
         self.assertEqual(date_heading(text, "0.42.0", "2026-11-16"), text)
+
+
+class DateMain(unittest.TestCase):
+    """prepare-release.py's date_main: warns and leaves the file alone when it can't or needn't date."""
+
+    def run_date_main(self, text):
+        prep = load_prepare_release()
+        with tempfile.TemporaryDirectory() as tmp:
+            path = pathlib.Path(tmp) / "CHANGELOG.md"
+            path.write_bytes(text.encode())
+            out, err = io.StringIO(), io.StringIO()
+            with contextlib.redirect_stdout(out), contextlib.redirect_stderr(err):
+                prep.date_main(str(path), "0.42.0", "2026-11-16")
+            return path.read_bytes().decode(), out.getvalue(), err.getvalue()
+
+    def test_missing_heading_warns(self):
+        text = "## Unreleased\n\n## 0.41.0 (2026-10-01)\n"
+        after, _, err = self.run_date_main(text)
+        self.assertEqual(after, text)
+        self.assertIn("no `## 0.42.0` heading", err)
+
+    def test_already_dated(self):
+        text = "## Unreleased\n\n## 0.42.0 (2026-11-16)\n"
+        after, out, err = self.run_date_main(text)
+        self.assertEqual(after, text)
+        self.assertIn("already reads", out)
+        self.assertEqual(err, "")
+
+    def test_missing_file_warns(self):
+        prep = load_prepare_release()
+        err = io.StringIO()
+        with tempfile.TemporaryDirectory() as tmp, contextlib.redirect_stderr(err):
+            prep.date_main(str(pathlib.Path(tmp) / "absent.md"), "0.42.0", "2026-11-16")
+        self.assertIn("does not exist", err.getvalue())
+
+    def test_crlf_file_keeps_its_line_endings(self):
+        text = "## Unreleased\r\n\r\n## 0.42.0 (unreleased)\r\n\r\n- feat: x\r\n"
+        after, _, _ = self.run_date_main(text)
+        self.assertEqual(after, text.replace("(unreleased)", "(2026-11-16)"))
+
+    def test_duplicate_heading_warns(self):
+        text = "## Unreleased\n\n## 0.42.0 (unreleased)\n\n## 0.42.0 (release/0.42)\n"
+        after, _, err = self.run_date_main(text)
+        self.assertIn("more than one", err)
+        self.assertEqual(after, "## Unreleased\n\n## 0.42.0 (2026-11-16)\n\n## 0.42.0 (release/0.42)\n")
 
 
 def git(cwd, *args):
