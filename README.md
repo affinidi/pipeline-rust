@@ -120,7 +120,10 @@ stabilised with release candidates, published at GA and patched by backport.
 | Patch | `release-prep`, kind `patch` | `0.4.N` | `v0.4.N` | `0.4.N` |
 
 Merging a prep PR is the release: `release-tag` tags it and `release-publish`
-publishes it. The other actions keep the flow honest: `release-guards`
+publishes it. `main` keeps the release's changelog under
+`## 0.4.0 (unreleased)` from the cut; the GA prep also opens a
+`release-date/0.4` PR to `main` that gives it the GA's heading,
+`## 0.4.0 (date)`, the same as the release branch's. The other actions keep the flow honest: `release-guards`
 (lockstep versions, CHANGELOG.md and RELEASE agree), `release-branch-rules`
 (fixes reach a release branch by backport, only the tooling moves versions),
 `release-backport`, `release-nightly` (cuts come from the newest fully green

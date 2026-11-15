@@ -19,13 +19,17 @@ on any ref but main, whose workflow file is the reviewed one. It:
      crates are not published);
   3. opens a PR to main (`release-cut/<name>`) that moves the workspace to the
      next minor (`0.43.0` after `0.42`) and starts a fresh `## Unreleased`
-     section in CHANGELOG.md, the old one becoming `<name>.0`'s;
+     section in CHANGELOG.md, the old one becoming `## <name>.0 (unreleased)`.
+     The GA prep (prepare-release.py) dates that heading on main with the
+     date it gives the release branch's, so both read `## <name>.0 (date)`;
   4. creates the `backport release/<name>` label backport.yml reads.
 
 The CHANGELOG split is only automatic when main's `## Unreleased` section is
 the one the source commit has (nothing changelogged landed after nightly). If
 it differs, main's CHANGELOG is left alone and the script says so: move the
-entries that shipped in the release under its heading by hand, in the PR.
+entries that shipped in the release under `## <name>.0 (unreleased)` by hand,
+in the PR. Any `## <name>.0 …` heading is dated at GA; the wording after the
+version is only a placeholder.
 """
 
 import argparse
@@ -35,7 +39,7 @@ import re
 import sys
 import tempfile
 
-from release_lib import RELEASE_NAME, git, is_maintainer, run, set_version, unreleased_split
+from release_lib import RELEASE_NAME, close_unreleased, git, is_maintainer, run, set_version, unreleased_split
 
 
 def worktree(rev, tmp, name):
@@ -99,9 +103,9 @@ def main():
                 source_log = git("show", f"{source}:CHANGELOG.md", check=False).stdout
                 src, cur = unreleased_split(source_log), unreleased_split(main_changelog.read_text())
                 split = bool(src and cur and src[1] == cur[1])
-                if split:
-                    before, body, after = cur
-                    main_changelog.write_text(f"{before}## Unreleased\n\n## {version} ({branch})\n{body}{after}")
+                closed = close_unreleased(main_changelog.read_text(), version) if split else None
+                if closed is not None:
+                    main_changelog.write_text(closed)
             git("add", "-A", cwd=mn)
             git(
                 "commit",
@@ -117,7 +121,7 @@ def main():
                 print(
                     "WARNING: main's `## Unreleased` differs from the cut's (or CHANGELOG.md is "
                     "missing); CHANGELOG.md on main was not split. Move the shipped entries under "
-                    f"`## {version}` by hand in the release-cut PR.",
+                    f"`## {version} (unreleased)` by hand in the release-cut PR; the GA prep dates it.",
                     file=sys.stderr,
                 )
             if args.dry_run:

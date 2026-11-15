@@ -37,9 +37,12 @@ check fails a tree where the versions disagree. On a release branch, the
 | Patch | the same, kind `patch` | `0.4.N` | `v0.4.N` | `0.4.N` |
 
 Only an admin or maintainer may cut. The cut also opens a PR that moves `main`
-to the next minor and starts a new `## Unreleased` section in `CHANGELOG.md`;
-merge it. Merging a prep PR is the release: it is tagged, and a GA or patch is
-published to crates.io. Step by step:
+to the next minor and starts a new `## Unreleased` section in `CHANGELOG.md`,
+the released notes moving under `## 0.4.0 (unreleased)`; merge it. The GA prep
+dates that heading in a second PR to `main`, so `main` and `release/0.4` both
+read `## 0.4.0 (<GA date>)`; merge that one with the GA. Merging a prep PR is
+the release: it is tagged, and a GA or patch is published to crates.io. Step
+by step:
 [How to release](https://github.com/affinidi/pipeline-rust/blob/main/docs/how-to-release.md).
 
 ## Schedule
