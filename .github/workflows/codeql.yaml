@@ -1,0 +1,59 @@
+# CodeQL analysis as a reusable workflow, for callers that run it on a
+# schedule instead of on every PR: the Rust analysis is too slow to gate PRs.
+# The caller owns the triggers and concurrency, and must grant the job
+# permissions below. Repo-level CodeQL "default setup" must be disabled on the
+# caller, or GitHub rejects the results this workflow uploads. See README.md.
+on:
+  workflow_call:
+    inputs:
+      languages:
+        description: >-
+          JSON list of CodeQL languages to analyse, one job each. All are
+          analysed without a build (build-mode none), so only languages that
+          support it work: actions, javascript-typescript, python, ruby, rust.
+          A language with no source in the repository fails its job.
+        required: false
+        type: string
+        default: '["actions", "rust"]'
+      runs-on:
+        required: false
+        type: string
+        default: ubuntu-24.04
+      timeout-minutes:
+        description: >-
+          Per-language job timeout. The Rust analysis of a large workspace is
+          the longest; raise this before it is reached rather than drop Rust.
+        required: false
+        type: number
+        default: 120
+
+jobs:
+  analyze:
+    name: Analyze (${{ matrix.language }})
+    runs-on: ${{ inputs.runs-on }}
+    timeout-minutes: ${{ inputs.timeout-minutes }}
+    # The caller must grant at least these. actions: read is needed on private
+    # repositories only.
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ${{ fromJSON(inputs.languages) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          languages: ${{ matrix.language }}
+          build-mode: none
+
+      - name: Perform CodeQL analysis
+        uses: github/codeql-action/analyze@33d7b85da1a04171e211befe2c739303b9a4c066 # v4.39.3
+        with:
+          category: /language:${{ matrix.language }}
