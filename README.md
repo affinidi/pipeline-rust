@@ -41,6 +41,55 @@ jobs:
       auditIgnore: "RUSTSEC-2022-0040,RUSTSEC-2023-0071,RUSTSEC-2024-0373"
 ```
 
+## CodeQL
+
+`codeql.yaml` runs CodeQL on a schedule rather than on every PR, because the
+Rust analysis is too slow to gate PRs. Each language is its own job, analysed
+without a build. Results go to the repository's **Security → Code scanning**.
+
+Add `.github/workflows/codeql.yml` to your repository:
+
+```yaml
+name: CodeQL
+
+on:
+  schedule:
+    - cron: '0 2 * * 1'  # Mondays 02:00 UTC; scheduled runs use the default branch
+  workflow_dispatch:      # manual run from the Actions tab
+
+permissions:
+  contents: read
+
+concurrency:
+  group: codeql-${{ github.ref }}
+  cancel-in-progress: false  # a manual run queues; it must not cancel a long scan
+
+jobs:
+  codeql:
+    uses: affinidi/pipeline-rust/.github/workflows/codeql.yaml@<commit>
+    permissions:
+      actions: read
+      contents: read
+      security-events: write
+    with:
+      languages: '["actions", "javascript-typescript", "python", "rust"]'
+```
+
+| Input | Default | What it does |
+|---|---|---|
+| `languages` | `["actions", "rust"]` | JSON list of languages, one job each. Only languages that need no build work: `actions`, `javascript-typescript`, `python`, `ruby`, `rust`. A language with no source in the repository fails its job. |
+| `runs-on` | `ubuntu-24.04` | Runner for the analysis jobs. |
+| `timeout-minutes` | `120` | Per-language job timeout. Raise it if the Rust job comes close. |
+
+Before you adopt it:
+
+- Disable CodeQL **default setup** (Settings → Code security). GitHub rejects
+  results from a workflow while default setup is on.
+- Nothing runs on PRs, so remove any ruleset rule that waits for CodeQL on a
+  PR: `Analyze (...)` required status checks and the **Require code scanning
+  results** (`code_scanning`) rule. Either blocks every PR otherwise.
+- The check runs are named `codeql / Analyze (<language>)`.
+
 ## Linux release binaries
 
 `release-binaries.yaml` builds a binary for x86_64 and aarch64 Linux when a

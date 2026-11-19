@@ -8,4 +8,5 @@
 /scripts/audit/                     @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
 /.github/workflows/audit.yaml       @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
 /.github/workflows/cargo-deny.yaml  @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
+/.github/workflows/codeql.yaml      @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
 /SECURITY.md                        @tupi1337 @roland-gh-aff @lokeshxc @yilmazlarmurat @vikramvashisthaff
