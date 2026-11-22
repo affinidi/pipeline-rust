@@ -83,6 +83,13 @@ jobs:
       runs-on: ${{ inputs.runs-on }}
 
   rust-scan:
+    # Not on Dependabot's runs: GitHub gives a Dependabot-triggered workflow
+    # only the repository's Dependabot secrets, so SNYK_SCANNER_TOKEN is empty
+    # and the scanner fails at its auth step. That failure says nothing about
+    # the code and fails every dependency PR. `github` here is the caller's
+    # context, so this holds for every repository using this workflow; a
+    # human push or the scheduled run on main still scans.
+    if: github.actor != 'dependabot[bot]'
     uses: affinidi/pipeline-security/.github/workflows/rust-scanner.yml@3aeeb2ceac5c60e12ebddf3ae7bdf9cae56c78b5 # main, 2026-09-25
     # The scanner only reads the code: pass it its own secrets, not every one.
     permissions:
