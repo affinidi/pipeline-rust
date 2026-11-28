@@ -1,8 +1,10 @@
 # Tags v<RELEASE> and opens its GitHub Release, on a push to a release branch
 # that moves RELEASE (the cut, or a merged prep PR). A release candidate
 # (vX.Y.Z-rc.N) is a prerelease and never "latest". The notes are the
-# version's CHANGELOG.md section where it has one, otherwise generated.
-# An existing tag is never moved.
+# version's CHANGELOG.md section where it has one, otherwise generated; a
+# section over GitHub's 125,000-character body limit is cut at a line and
+# links the full CHANGELOG.md at the tag. An existing tag is never moved, but
+# a rerun opens its Release when an earlier run tagged and then failed.
 #
 # token creates the tag and the Release. A tag ruleset often lets only an app
 # create tags, and a tag GITHUB_TOKEN creates triggers no workflow, so pass a
@@ -55,10 +57,19 @@ runs:
         fi
         tag="v${version}"
         echo "tag=${tag}" >> "${GITHUB_OUTPUT}"
+        args=(--title "${tag}")
         if git rev-parse -q --verify "refs/tags/${tag}" >/dev/null; then
-          echo "::warning::${tag} already exists; not moving it"
+          if gh release view "${tag}" >/dev/null 2>&1; then
+            echo "::warning::${tag} and its Release already exist; not moving it"
+            echo "created=false" >> "${GITHUB_OUTPUT}"
+            exit 0
+          fi
+          # An earlier run tagged, then failed to open the Release.
+          echo "::warning::${tag} exists without a Release; opening it on the existing tag"
           echo "created=false" >> "${GITHUB_OUTPUT}"
-          exit 0
+        else
+          args+=(--target "${SHA}")
+          echo "created=true" >> "${GITHUB_OUTPUT}"
         fi
         # The version's own CHANGELOG section, heading excluded.
         notes="${RUNNER_TEMP}/notes.md"
@@ -70,7 +81,20 @@ runs:
             on { print }
           ' CHANGELOG.md > "${notes}"
         fi
-        args=(--target "${SHA}" --title "${tag}")
+        # GitHub refuses a body over 125,000 characters. wc -c counts bytes,
+        # never fewer than characters; awk counts characters or bytes by
+        # locale. Either way whole lines under 120,000 fit, and the rest is
+        # linked.
+        limit=120000
+        if [ "$(wc -c < "${notes}")" -gt "${limit}" ]; then
+          url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/blob/${tag}/CHANGELOG.md"
+          awk -v max="${limit}" '{ n += length($0) + 1; if (n > max) exit; print }' \
+            "${notes}" > "${notes}.cut"
+          printf '\n---\n\nThese notes are cut short to fit a GitHub Release. The full %s section is in [CHANGELOG.md](%s).\n' \
+            "${version}" "${url}" >> "${notes}.cut"
+          mv "${notes}.cut" "${notes}"
+          echo "::warning::${version}'s CHANGELOG section is over ${limit} bytes; the Release notes are cut short"
+        fi
         case "${version}" in
           *-rc.*) args+=(--prerelease --latest=false) ;;
         esac
@@ -80,4 +104,3 @@ runs:
           args+=(--generate-notes)
         fi
         gh release create "${tag}" "${args[@]}"
-        echo "created=true" >> "${GITHUB_OUTPUT}"
